@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendar Boy</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f8fafd;
+    --line: #dadce0;
+    --text: #1f1f1f;
+    --muted: #70757a;
+    --faded: #b8bcc2;
+    --accent: #1a73e8;
+    --ink: #2b2b2b;
+
+    --movie: #8b5cf6;    --movie-bg: #ede9fe;
+    --holiday: #0ea5e9;  --holiday-bg: #e0f2fe;
+    --gym: #f97316;      --gym-bg: #ffedd5;
+    --shopping: #ec4899; --shopping-bg: #fce7f3;
+    --call: #22c55e;     --call-bg: #dcfce7;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- Header ---------- */
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 8px; font-size: 20px; color: var(--muted); margin-right: 24px; }
+  .brand svg { width: 36px; height: 36px; }
+  .today-btn {
+    border: 1px solid var(--line); background: var(--bg);
+    border-radius: 18px; padding: 6px 16px; cursor: not-allowed;
+  }
+  .nav-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 0; background: transparent; color: var(--faded);
+    font-size: 18px; cursor: not-allowed;
+  }
+  header h1 { margin: 0 0 0 4px; font-size: 22px; font-weight: 400; }
+
+  /* ---------- Layout ---------- */
+  .app { display: flex; min-height: calc(100% - 57px); }
+  aside {
+    width: 220px; flex-shrink: 0;
+    padding: 16px;
+  }
+  aside h2 { font-size: 13px; font-weight: 600; margin: 8px 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .legend { list-style: none; margin: 0; padding: 0; }
+  .legend li { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  .legend .chip { width: 36px; height: 36px; }
+  .note { margin-top: 24px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+  main { flex: 1; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line); }
+
+  .dow {
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    border-bottom: 1px solid var(--line);
+  }
+  .dow div { text-align: center; padding: 6px 0; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .05em; }
+
+  .weeks { flex: 1; display: flex; flex-direction: column; }
+  .week {
+    position: relative; flex: 1 0 auto;
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    border-bottom: 1px solid var(--line);
+    min-height: 130px;
+  }
+  .day { border-right: 1px solid var(--line); padding: 4px; min-width: 0; }
+  .day:last-child { border-right: 0; }
+  .day.other { background: var(--surface); }
+  .day.other .date { color: var(--faded); }
+  .date {
+    text-align: center; font-size: 12px; font-weight: 500;
+    width: 24px; height: 24px; line-height: 24px; margin: 0 auto 2px;
+    border-radius: 50%;
+  }
+  .date.today { background: var(--accent); color: #fff; }
+  .week.has-trip .day .lane { height: 50px; }
+
+  /* ---------- Events ---------- */
+  .chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; flex-shrink: 0;
+    border-radius: 10px;
+  }
+  .chip svg { width: 82%; height: 82%; display: block; }
+  .chip.movie    { background: var(--movie-bg); }
+  .chip.holiday  { background: var(--holiday-bg); }
+  .chip.gym      { background: var(--gym-bg); }
+  .chip.shopping { background: var(--shopping-bg); }
+  .chip.call     { background: var(--call-bg); }
+
+  .event {
+    display: flex; align-items: center; gap: 6px;
+    width: 100%; padding: 2px; margin-bottom: 2px;
+    border: 0; background: transparent; border-radius: 8px;
+    text-align: left; cursor: pointer;
+  }
+  .event:hover, .trip:hover .chip, .more:hover { background: #f1f3f4; }
+  .event .label { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .event .label small { display: block; color: var(--muted); font-size: 11px; }
+  .more {
+    border: 0; background: transparent; border-radius: 6px;
+    padding: 2px 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+
+  /* ---------- Trip overlay ---------- */
+  .trip {
+    position: absolute; top: 30px; height: 46px;
+    display: flex; align-items: center;
+    border: 0; background: transparent; padding: 0; cursor: pointer;
+  }
+  .trip .chip { width: 46px; height: 46px; border-radius: 12px; }
+  .trip .path {
+    flex: 1; position: relative; height: 0;
+    border-top: 3px dashed var(--holiday);
+    margin: 0 4px;
+  }
+  .trip .path.to-edge { margin-right: 0; }
+  .trip .path.from-edge { margin-left: 0; }
+  .trip .path span {
+    position: absolute; left: 50%; top: -12px; transform: translateX(-50%);
+    background: var(--holiday-bg); color: #075985;
+    border-radius: 10px; padding: 2px 10px; font-size: 12px; font-weight: 600; white-space: nowrap;
+  }
+  .trip .arrow { color: var(--holiday); font-weight: 700; font-size: 16px; line-height: 1; margin-left: -2px; }
+
+  /* ---------- Popover ---------- */
+  .popover {
+    position: fixed; z-index: 10; width: 300px; max-width: calc(100vw - 32px);
+    background: var(--bg); border-radius: 12px; padding: 16px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.22);
+  }
+  .popover[hidden] { display: none; }
+  .popover .close {
+    position: absolute; top: 8px; right: 8px; width: 28px; height: 28px;
+    border: 0; background: transparent; border-radius: 50%; font-size: 18px; cursor: pointer; color: var(--muted);
+  }
+  .popover .close:hover { background: #f1f3f4; }
+  .pop-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; padding-right: 24px; }
+  .pop-head .chip { width: 64px; height: 64px; border-radius: 16px; }
+  .pop-head h3 { margin: 0; font-size: 18px; font-weight: 500; }
+  .pop-head .type { font-size: 12px; color: var(--muted); }
+  .pop-when { color: var(--text); margin: 4px 0; }
+  .pop-notes { color: var(--muted); margin: 8px 0 0; line-height: 1.45; }
+  .pop-day-title { margin: 0 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+
+  /* ---------- Narrow screens ---------- */
+  @media (max-width: 800px) {
+    aside { display: none; }
+    main { border-left: 0; }
+    .brand span { display: none; }
+    .brand { margin-right: 0; }
+    header { gap: 4px; padding: 10px 12px; }
+    header h1 { font-size: 18px; white-space: nowrap; }
+    .today-btn { padding: 6px 12px; }
+    .week { min-height: 96px; }
+    .day { padding: 2px; }
+    .day .events { display: flex; flex-wrap: wrap; gap: 2px; }
+    .event { width: auto; padding: 0; margin: 0; }
+    .event .label { display: none; }
+    .chip { width: 26px; height: 26px; border-radius: 7px; }
+    .trip .chip { width: 30px; height: 30px; border-radius: 8px; }
+    .trip { top: 28px; height: 30px; }
+    .week.has-trip .day .lane { height: 34px; }
+    .trip .path span { display: none; }
+    .more { padding: 0 2px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><svg id="brand-icon" viewBox="0 0 64 64" aria-hidden="true"></svg><span>Calendar Boy</span></div>
+  <button class="today-btn" disabled title="Prototype shows January 2027 only">Today</button>
+  <button class="nav-btn" disabled aria-label="Previous month" title="Prototype shows January 2027 only">&#8249;</button>
+  <button class="nav-btn" disabled aria-label="Next month" title="Prototype shows January 2027 only">&#8250;</button>
+  <h1>January 2027</h1>
+</header>
+
+<div class="app">
+  <aside>
+    <h2>Event types</h2>
+    <ul class="legend" id="legend"></ul>
+    <p class="note">Proof of concept: January 2027 sample data. Click any icon for details.</p>
+  </aside>
+  <main>
+    <div class="dow"><div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div></div>
+    <div class="weeks" id="weeks"></div>
+  </main>
+</div>
+
+<div class="popover" id="popover" hidden role="dialog" aria-modal="false">
+  <button class="close" id="pop-close" aria-label="Close">&times;</button>
+  <div id="pop-body"></div>
+</div>
+
+<script>
+// ---------- Cartoon icons (64x64, thick outline, flat fills) ----------
+const OUTLINE = 'stroke="#2b2b2b" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"';
+
+const PLANE = `
+  <path d="M10 27 L6 13 H13 L23 27 Z" fill="#38bdf8" ${OUTLINE}/>
+  <path d="M8 31 Q8 26 15 26 H47 Q58 26 60 31.5 Q58 37 47 37 H15 Q8 37 8 31 Z" fill="#f8fafc" ${OUTLINE}/>
+  <path d="M52 28.5 Q56 29 57.5 31 H52 Z" fill="#7dd3fc" stroke="#2b2b2b" stroke-width="2" stroke-linejoin="round"/>
+  <circle cx="22" cy="31" r="1.8" fill="#0ea5e9"/><circle cx="28" cy="31" r="1.8" fill="#0ea5e9"/>
+  <circle cx="34" cy="31" r="1.8" fill="#0ea5e9"/><circle cx="40" cy="31" r="1.8" fill="#0ea5e9"/>
+  <circle cx="46" cy="31" r="1.8" fill="#0ea5e9"/>
+  <path d="M26 34 H38 L29 48 H22 Z" fill="#0ea5e9" ${OUTLINE}/>`;
+
+const ICONS = {
+  movie: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <circle cx="19" cy="16" r="10" fill="#c4b5fd" ${OUTLINE}/><circle cx="19" cy="16" r="3" fill="#2b2b2b"/>
+    <circle cx="40" cy="16" r="10" fill="#c4b5fd" ${OUTLINE}/><circle cx="40" cy="16" r="3" fill="#2b2b2b"/>
+    <rect x="7" y="27" width="38" height="25" rx="5" fill="#8b5cf6" ${OUTLINE}/>
+    <path d="M45 34 L58 27 V52 L45 45 Z" fill="#ddd6fe" ${OUTLINE}/>
+    <circle cx="14" cy="34" r="2.5" fill="#f43f5e"/>
+    <rect x="13" y="40" width="20" height="6" rx="3" fill="#ede9fe"/>
+  </svg>`,
+
+  planeTakeoff: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <path d="M4 58 H34" stroke="#64748b" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 4"/>
+    <circle cx="8" cy="50" r="3.5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2"/>
+    <circle cx="14" cy="53" r="2.5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2"/>
+    <g transform="rotate(-24 34 31) translate(0 -2)">${PLANE}</g>
+  </svg>`,
+
+  planeLanding: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <path d="M28 58 H60" stroke="#64748b" stroke-width="3" stroke-linecap="round" stroke-dasharray="6 4"/>
+    <g transform="rotate(16 34 31) translate(-2 -6)">
+      ${PLANE}
+      <path d="M44 37 V42" stroke="#2b2b2b" stroke-width="2.5"/><circle cx="44" cy="44" r="2.5" fill="#2b2b2b"/>
+      <path d="M20 37 V42" stroke="#2b2b2b" stroke-width="2.5"/><circle cx="20" cy="44" r="2.5" fill="#2b2b2b"/>
+    </g>
+  </svg>`,
+
+  gym: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <rect x="16" y="29" width="32" height="6" rx="2" fill="#94a3b8" ${OUTLINE}/>
+    <rect x="9" y="17" width="9" height="30" rx="3" fill="#f97316" ${OUTLINE}/>
+    <rect x="46" y="17" width="9" height="30" rx="3" fill="#f97316" ${OUTLINE}/>
+    <rect x="3" y="23" width="7" height="18" rx="2.5" fill="#fdba74" ${OUTLINE}/>
+    <rect x="54" y="23" width="7" height="18" rx="2.5" fill="#fdba74" ${OUTLINE}/>
+    <path d="M12 21 V27" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M49 21 V27" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>`,
+
+  shopping: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <path d="M23 22 V16 Q23 7 32 7 Q41 7 41 16 V22" fill="none" ${OUTLINE}/>
+    <path d="M11 20 H53 L50 57 H14 Z" fill="#ec4899" ${OUTLINE}/>
+    <circle cx="23" cy="27" r="2.5" fill="#2b2b2b"/><circle cx="41" cy="27" r="2.5" fill="#2b2b2b"/>
+    <path d="M32 49 C24 43 23 37 27 35 C29.5 34 31 35.5 32 37 C33 35.5 34.5 34 37 35 C41 37 40 43 32 49 Z" fill="#fce7f3" stroke="#2b2b2b" stroke-width="2.5" stroke-linejoin="round"/>
+  </svg>`,
+
+  call: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <rect x="8" y="14" width="26" height="44" rx="6" fill="#22c55e" ${OUTLINE}/>
+    <rect x="12" y="20" width="18" height="28" rx="2" fill="#dcfce7"/>
+    <circle cx="21" cy="53" r="2" fill="#2b2b2b"/>
+    <path d="M36 6 H58 Q61 6 61 9 V24 Q61 27 58 27 H46 L39 33 V27 H36 Q33 27 33 24 V9 Q33 6 36 6 Z" fill="#fff" ${OUTLINE}/>
+    <circle cx="40" cy="16.5" r="2.2" fill="#22c55e"/><circle cx="47" cy="16.5" r="2.2" fill="#22c55e"/><circle cx="54" cy="16.5" r="2.2" fill="#22c55e"/>
+    <path d="M17 33 Q21 27 25 33" fill="none" stroke="#15803d" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>`,
+};
+
+const TYPES = {
+  movie:    { name: 'Movie',            icon: 'movie' },
+  holiday:  { name: 'Overseas holiday', icon: 'planeTakeoff' },
+  gym:      { name: 'Gym',              icon: 'gym' },
+  shopping: { name: 'Shopping',         icon: 'shopping' },
+  call:     { name: 'Call friend',      icon: 'call' },
+};
+
+// ---------- Sample data: January 2027 ----------
+const EVENTS = [
+  { id: 1,  type: 'call',     title: 'New Year call with Sam',  start: '2027-01-01', time: '11:00', notes: 'Wish Sam a happy new year and hear about the party.' },
+  { id: 2,  type: 'shopping', title: 'January sales',           start: '2027-01-02', time: '10:00', notes: 'New running shoes and a winter coat.' },
+  { id: 3,  type: 'movie',    title: 'Cinema: new release',     start: '2027-01-02', time: '19:30', notes: 'Screen 4. Booked seats G12–G13.' },
+  { id: 4,  type: 'gym',      title: 'Gym: legs',               start: '2027-01-04', time: '07:00', notes: 'Squats, lunges, leg press.' },
+  { id: 5,  type: 'gym',      title: 'Gym: upper body',         start: '2027-01-06', time: '07:00', notes: 'Bench, rows, shoulder press.' },
+  { id: 6,  type: 'gym',      title: 'Gym: cardio',             start: '2027-01-08', time: '07:00', notes: '30 min intervals on the bike.' },
+  { id: 7,  type: 'shopping', title: 'Travel adapters',         start: '2027-01-09', time: '14:00', notes: 'Type A plug adapters, sunscreen, travel pillow.' },
+  { id: 8,  type: 'call',     title: 'Call Mum',                start: '2027-01-09', time: '18:00', notes: 'Share the trip itinerary.' },
+  { id: 9,  type: 'gym',      title: 'Gym: full body',          start: '2027-01-11', time: '07:00', notes: 'Last session before the trip.' },
+  { id: 10, type: 'gym',      title: 'Gym: stretch',            start: '2027-01-13', time: '07:00', notes: 'Light yoga and mobility.' },
+  { id: 11, type: 'shopping', title: 'Last-minute packing',     start: '2027-01-13', time: '12:00', notes: 'Toiletries and snacks for the flight.' },
+  { id: 12, type: 'call',     title: 'Call Priya',              start: '2027-01-13', time: '18:00', notes: 'Ask her to water the plants while I am away.' },
+  { id: 13, type: 'movie',    title: 'Movie night at home',     start: '2027-01-13', time: '20:30', notes: 'Something light before an early flight.' },
+  { id: 14, type: 'holiday',  title: 'Trip to Tokyo',           start: '2027-01-14', end: '2027-01-20', time: 'Departs 09:15 · Lands 16:40', notes: 'Flight out on the 14th, home on the 20th. Hotel in Shinjuku.' },
+  { id: 15, type: 'movie',    title: 'Cinema with Alex',        start: '2027-01-22', time: '20:00', notes: 'Alex is choosing the film this time.' },
+  { id: 16, type: 'call',     title: 'Catch-up with Jo',        start: '2027-01-23', time: '15:00', notes: 'Tell Jo all about Tokyo.' },
+  { id: 17, type: 'gym',      title: 'Gym: back on it',         start: '2027-01-25', time: '07:00', notes: 'Easy session after the holiday.' },
+  { id: 18, type: 'gym',      title: 'Gym: upper body',         start: '2027-01-27', time: '07:00', notes: '' },
+  { id: 19, type: 'gym',      title: 'Gym: cardio',             start: '2027-01-29', time: '07:00', notes: '' },
+  { id: 20, type: 'shopping', title: 'Weekly groceries',        start: '2027-01-30', time: '10:00', notes: 'Fruit, veg, coffee beans.' },
+  { id: 21, type: 'call',     title: 'Sunday call with Gran',   start: '2027-01-31', time: '17:00', notes: '' },
+];
+
+// ---------- Date helpers ----------
+const YEAR = 2027, MONTH = 0; // January
+const MAX_VISIBLE = 3;
+
+function parseDate(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function key(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function sameDay(a, b) { return key(a) === key(b); }
+function fmtDate(d) { return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+function chip(type, iconName) {
+  return `<span class="chip ${type}">${ICONS[iconName || TYPES[type].icon]}</span>`;
+}
+
+// ---------- Render ----------
+const firstOfMonth = new Date(YEAR, MONTH, 1);
+const gridStart = addDays(firstOfMonth, -firstOfMonth.getDay());
+const today = new Date();
+
+const singleDay = EVENTS.filter(e => !e.end);
+const trips = EVENTS.filter(e => e.end);
+
+function eventsOn(d) {
+  return singleDay.filter(e => e.start === key(d)).sort((a, b) => a.time.localeCompare(b.time));
+}
+
+function renderEvent(e) {
+  return `<button class="event" data-id="${e.id}" title="${esc(e.title)}">
+    ${chip(e.type)}<span class="label">${esc(e.title)}<small>${esc(e.time)}</small></span>
+  </button>`;
+}
+
+function renderWeeks() {
+  const weeksEl = document.getElementById('weeks');
+  let html = '';
+  for (let w = 0; w < 6; w++) {
+    const weekStart = addDays(gridStart, w * 7);
+    const weekEnd = addDays(weekStart, 6);
+    const weekTrips = trips.filter(t => parseDate(t.start) <= weekEnd && parseDate(t.end) >= weekStart);
+
+    let cells = '';
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(weekStart, i);
+      const evs = eventsOn(d);
+      const shown = evs.length > MAX_VISIBLE ? evs.slice(0, MAX_VISIBLE - 1) : evs;
+      const hidden = evs.length - shown.length;
+      cells += `<div class="day${d.getMonth() !== MONTH ? ' other' : ''}">
+        <div class="date${sameDay(d, today) ? ' today' : ''}">${d.getDate()}</div>
+        <div class="lane"></div>
+        <div class="events">
+          ${shown.map(renderEvent).join('')}
+          ${hidden ? `<button class="more" data-day="${key(d)}">+${hidden} more</button>` : ''}
+        </div>
+      </div>`;
+    }
+
+    const overlays = weekTrips.map(t => renderTripSegment(t, weekStart, weekEnd)).join('');
+    html += `<div class="week${weekTrips.length ? ' has-trip' : ''}">${cells}${overlays}</div>`;
+  }
+  weeksEl.innerHTML = html;
+}
+
+// One strip per week row: takeoff at the start day, dashed path, landing at the end day.
+function renderTripSegment(t, weekStart, weekEnd) {
+  const start = parseDate(t.start), end = parseDate(t.end);
+  const segStart = start > weekStart ? start : weekStart;
+  const segEnd = end < weekEnd ? end : weekEnd;
+  const col = segStart.getDay();
+  const span = segEnd.getDay() - col + 1;
+  const startsHere = sameDay(segStart, start);
+  const endsHere = sameDay(segEnd, end);
+
+  const pathClass = ['path', !endsHere && 'to-edge', !startsHere && 'from-edge'].filter(Boolean).join(' ');
+  const showLabel = span >= 2;
+  return `<button class="trip" data-id="${t.id}" title="${esc(t.title)}"
+      style="left: calc(${col} * 100% / 7 + 4px); width: calc(${span} * 100% / 7 - ${endsHere ? 8 : 4}px);">
+    ${startsHere ? chip('holiday', 'planeTakeoff') : ''}
+    <span class="${pathClass}">${showLabel ? `<span>${esc(t.title)}${startsHere ? '' : ' (cont.)'}</span>` : ''}</span>
+    ${endsHere ? chip('holiday', 'planeLanding') : '<span class="arrow">&#8250;</span>'}
+  </button>`;
+}
+
+function renderLegend() {
+  document.getElementById('legend').innerHTML = Object.entries(TYPES)
+    .map(([type, t]) => `<li>${chip(type)}<span>${t.name}</span></li>`).join('');
+  document.getElementById('brand-icon').outerHTML = ICONS.movie.replace('<svg', '<svg id="brand-icon"');
+}
+
+// ---------- Popover ----------
+const popover = document.getElementById('popover');
+const popBody = document.getElementById('pop-body');
+
+function eventDetail(e) {
+  const when = e.end
+    ? `${fmtDate(parseDate(e.start))} – ${fmtDate(parseDate(e.end))}`
+    : fmtDate(parseDate(e.start));
+  const icon = e.type === 'holiday' ? 'planeTakeoff' : null;
+  return `<div class="pop-head">${chip(e.type, icon)}<div><h3>${esc(e.title)}</h3><div class="type">${TYPES[e.type].name}</div></div></div>
+    <p class="pop-when">${when} · ${esc(e.time)}</p>
+    ${e.notes ? `<p class="pop-notes">${esc(e.notes)}</p>` : ''}`;
+}
+
+function dayList(dayKey) {
+  const d = parseDate(dayKey);
+  return `<p class="pop-day-title">${fmtDate(d)}</p>${eventsOn(d).map(renderEvent).join('')}`;
+}
+
+function openPopover(html, anchor) {
+  popBody.innerHTML = html;
+  popover.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  const pw = popover.offsetWidth, ph = popover.offsetHeight;
+  const margin = 16;
+  let left = r.right + 8;
+  if (left + pw > window.innerWidth - margin) left = r.left - pw - 8;
+  left = Math.max(margin, Math.min(left, window.innerWidth - pw - margin));
+  let top = Math.max(margin, Math.min(r.top, window.innerHeight - ph - margin));
+  popover.style.left = left + 'px';
+  popover.style.top = top + 'px';
+}
+
+function closePopover() { popover.hidden = true; }
+
+document.addEventListener('click', ev => {
+  const target = ev.target.closest('.event, .trip, .more');
+  if (target) {
+    ev.stopPropagation();
+    if (target.dataset.day) {
+      openPopover(dayList(target.dataset.day), target);
+    } else {
+      const e = EVENTS.find(x => x.id === Number(target.dataset.id));
+      // Drilling in from a "+N more" list keeps the popover where it is.
+      if (popover.contains(target)) popBody.innerHTML = eventDetail(e);
+      else openPopover(eventDetail(e), target);
+    }
+    return;
+  }
+  if (!popover.contains(ev.target) || ev.target.id === 'pop-close') closePopover();
+});
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closePopover(); });
+window.addEventListener('resize', closePopover);
+
+renderLegend();
+renderWeeks();
+</script>
+</body>
+</html>
