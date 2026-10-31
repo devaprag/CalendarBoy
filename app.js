@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '3.1';
+const APP_VERSION = '3.2';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 2;
 const MAX_VISIBLE = 3;
@@ -519,8 +519,8 @@ const ACTIONS = {
     commit();
     refreshPopover();
   },
-  'prev-month': () => { state.settings.viewMonth = shiftMonth(viewMonth(), -1); commit(); },
-  'next-month': () => { state.settings.viewMonth = shiftMonth(viewMonth(), 1); commit(); },
+  'prev-month': () => changeMonth(-1),
+  'next-month': () => changeMonth(1),
   'go-today': () => { state.settings.viewMonth = today().slice(0, 7); commit(); },
   'real-today': () => setToday(key(new Date())),
   'toggle-lock': () => { state.settings.locked = !state.settings.locked; commit(); },
@@ -578,6 +578,59 @@ window.addEventListener('resize', () => {
 });
 
 todayInput.addEventListener('change', () => { if (todayInput.value) setToday(todayInput.value); });
+
+// ---------- Changing month: wheel (desktop) and swipe (phone) ----------
+const mainEl = document.querySelector('main');
+
+function changeMonth(n) {
+  state.settings.viewMonth = shiftMonth(viewMonth(), n);
+  closePopover();
+  commit();
+}
+
+// The wheel scrolls the page as normal until the month's top or bottom edge is on screen; scrolling
+// further turns the month. One gesture = one month: after a change, wheel events are ignored until
+// they pause, so trackpad momentum doesn't skip several months.
+const WHEEL_THRESHOLD = 60, WHEEL_PAUSE_MS = 250;
+let wheelSum = 0, wheelQuietUntil = 0;
+mainEl.addEventListener('wheel', ev => {
+  if (ev.ctrlKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY) || !ev.deltaY) return; // pinch-zoom, sideways
+  const dir = Math.sign(ev.deltaY);
+  const r = weeksEl.getBoundingClientRect();
+  const atEdge = dir > 0 ? r.bottom <= window.innerHeight + 1 : r.top >= -1;
+  if (!atEdge) { wheelSum = 0; return; }
+  ev.preventDefault();
+  const now = Date.now();
+  if (now < wheelQuietUntil) { wheelQuietUntil = now + WHEEL_PAUSE_MS; return; }
+  wheelSum += ev.deltaY * (ev.deltaMode === 1 ? 16 : 1); // line-based wheels report lines, not pixels
+  if (Math.abs(wheelSum) < WHEEL_THRESHOLD) return;
+  wheelSum = 0;
+  wheelQuietUntil = now + WHEEL_PAUSE_MS;
+  changeMonth(dir);
+  // Continue from the new month's matching edge if the page is taller than the window.
+  (dir > 0 ? mainEl : weeksEl).scrollIntoView({ block: dir > 0 ? 'start' : 'end' });
+}, { passive: false });
+
+// Horizontal swipe on the calendar: left = next month, right = previous (like turning pages).
+// Touch events rather than pointer events, because the browser cancels pointer events once it scrolls.
+const SWIPE_MIN_PX = 60, SWIPE_MAX_MS = 700;
+let swipe = null;
+mainEl.addEventListener('touchstart', ev => {
+  const draggable = !state.settings.locked && ev.target.closest('[data-drag]');
+  const t = ev.touches[0];
+  swipe = ev.touches.length === 1 && !draggable ? { x: t.clientX, y: t.clientY, time: Date.now() } : null;
+}, { passive: true });
+mainEl.addEventListener('touchend', ev => {
+  if (!swipe) return;
+  const t = ev.changedTouches[0];
+  const dx = t.clientX - swipe.x, dy = t.clientY - swipe.y, quick = Date.now() - swipe.time < SWIPE_MAX_MS;
+  swipe = null;
+  if (!quick || Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < 2 * Math.abs(dy)) return;
+  // A swipe shouldn't also count as a tap on the icon it started on.
+  suppressClick = true;
+  setTimeout(() => { suppressClick = false; }, 300);
+  changeMonth(dx < 0 ? 1 : -1);
+}, { passive: true });
 
 // ---------- Press: tap, long-press and drag (Pointer Events, so touch works too) ----------
 // A press that moves more than DRAG_THRESHOLD drags (only when unlocked; when locked the page

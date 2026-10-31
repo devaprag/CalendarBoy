@@ -76,10 +76,11 @@ Decided with the owner. Keep these unless the owner changes them.
 | Statuses | **To do → Done → Abandoned**. A **single tap/click cycles** through them in that order. New events start as To do. |
 | Looks (past *and* future alike) | To do = **coloured ring**. Done = **plain icon**. Abandoned = **greyed out**. |
 | Details popup | **Long-press** (500ms) on touch or mouse, or **right-click** on desktop. Double-click was dropped because two taps cycle the status twice. The popup has status buttons, title/time/notes/date fields, **Duplicate** (the copy lands on the next day as To do) and **Remove** (to the bin). |
-| Lock | The 🔒 button in the shelf. **Locked by default**, and remembered. When locked nothing can be dragged, so scrolling on a phone never moves icons. Tap and long-press still work. |
+| Lock | The 🔒 button: in the shelf on desktop, and a **floating round button bottom-left on phones** (mirroring the bin bottom-right). **Locked by default**, and remembered. When locked nothing can be dragged, so scrolling on a phone never moves icons. Tap and long-press still work. |
 | Shelf (top of the calendar) | Lock + **Add palette** (type icons to drag onto a day or the backlog) + **Backlog** (drop zone; drag items into a new **order**). |
 | Trips | Drag the **takeoff** icon to move **only the start**. Drag the **landing** icon to move **only the end** (start ≤ end is enforced). Drag the **dashed middle** to move the **whole trip**. The popup's start/end fields behave the same way. |
 | Months | All months: ‹ › arrows plus a **Today** button (jumps to pretend-today's month). Overflow days from neighbouring months show events and accept drops. |
+| Month by gesture | **Phone**: a horizontal swipe on the calendar (left = next, right = previous). When unlocked, swipes that start on an icon drag it instead. **Desktop**: the mouse wheel over the calendar changes month once the month's top/bottom edge is on screen; before that it scrolls the page. One wheel gesture = one month. |
 | "Today" | The **"Today is" date picker** sets a pretend today (default 18 Jan 2027, so the playground has a past). Data → "Use the real date as today". |
 | Show done filter | Hides **past** events that aren't done (to do or abandoned). Future events always show. |
 | Sidebar | Event types with **counts for the month on screen** (`5 / 12 done · 4 planned`, plus a progress bar when there's a goal), last done, and repeat cycle / next due / **overdue** (red). |
@@ -115,6 +116,10 @@ Decided with the owner. Keep these unless the owner changes them.
   - `.dragging .trip { pointer-events: none }`, so `elementFromPoint` finds the day under a trip strip.
   - `press.part` is `start`, `end` or `whole`.
   - `grabOffset()` keeps the grabbed day under the pointer for whole-trip moves.
+- **Month gestures**:
+  - Swipes use **touch events**, not pointer events: when locked, the browser takes the touch for scrolling and fires `pointercancel`.
+  - `main` has `touch-action: pan-y pinch-zoom`, so horizontal moves reach the page.
+  - The wheel handler is non-passive so it can `preventDefault()`. `WHEEL_PAUSE_MS` keeps trackpad momentum from skipping several months.
 - **Popup and resize**: the popup closes on resize only if the **width** changes. The phone keyboard changes the height while editing.
 - **Layout**:
   - `.week` must be `flex: 1 0 auto`.
@@ -122,7 +127,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (38 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (45 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.

@@ -132,6 +132,31 @@ function dragTo(src, target, from, to) {
     click(q('[data-action="delete-type"]'));
     ok('delete type removes its events', !typeById('shopping') && !state.events.some(e => e.typeId === 'shopping'));
 
+    // Wheel over the calendar changes month; one gesture = one month
+    const wheel = dy => q('#weeks').dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: dy }));
+    ok('month fits the window (wheel test precondition)', q('#weeks').getBoundingClientRect().bottom <= innerHeight);
+    wheel(120);
+    ok('wheel down -> next month', q('#month-title').textContent === 'February 2027');
+    wheel(120); wheel(120);
+    ok('momentum in the same gesture ignored', q('#month-title').textContent === 'February 2027');
+    await sleep(WHEEL_PAUSE_MS + 100);
+    wheel(-120);
+    ok('wheel up after a pause -> previous month', q('#month-title').textContent === 'January 2027');
+    await sleep(WHEEL_PAUSE_MS + 100);
+
+    // Horizontal swipe changes month; mostly-vertical swipes don't
+    const touch = (type, x, y) => {
+      const t = new Touch({ identifier: 1, target: q('#weeks'), clientX: x, clientY: y });
+      q('#weeks').dispatchEvent(new TouchEvent(type, { bubbles: true, touches: type === 'touchend' ? [] : [t], changedTouches: [t] }));
+    };
+    touch('touchstart', 300, 500); touch('touchend', 180, 510);
+    ok('swipe left -> next month', q('#month-title').textContent === 'February 2027');
+    touch('touchstart', 180, 500); touch('touchend', 320, 495);
+    ok('swipe right -> previous month', q('#month-title').textContent === 'January 2027');
+    touch('touchstart', 300, 300); touch('touchend', 230, 450);
+    ok('vertical-ish swipe ignored', q('#month-title').textContent === 'January 2027');
+    await sleep(350);
+
     // Migration from the phase 2 (v1) format
     const v1 = { version: 1, settings: { pretendToday: '2027-01-18', showDoneOnly: false }, types: [], events: [{ id: 'x', done: true }, { id: 'y', done: false }] };
     const m = migrate(v1);
