@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/**)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(bash tests/run-tests.sh*)",
+      "Bash(\"/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe\" *)",
+      "Bash(python *)",
+      "Bash(python - *)",
+      "Bash(sed *)",
+      "Bash(grep *)",
+      "Bash(ls *)",
+      "Bash(wc *)",
+      "Bash(cat *)",
+      "Bash(mkdir -p *)",
+      "Bash(rm -rf C:/Users/aprag/AppData/Local/Temp/claude/*)"
+    ]
+  }
+}

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Calendar Boy</title>
-<link rel="stylesheet" href="styles.css?v=4.3">
+<link rel="stylesheet" href="styles.css?v=4.4">
 </head>
 <body class="locked">
 
@@ -41,6 +41,7 @@
       <button class="side-toggle" id="side-toggle" data-action="toggle-stats" aria-controls="side-body">
         <h2>Event types</h2><span class="chevron" aria-hidden="true">&#9662;</span>
       </button>
+      <button class="btn small" data-action="open-year" title="A year of each habit at a glance">Year</button>
       <button class="btn small" data-action="add-type">+ Add</button>
     </div>
     <div id="side-body">
@@ -76,13 +77,16 @@
   <div id="pop-body"></div>
 </div>
 
+<div class="toast" id="toast" hidden role="status"><span id="toast-text"></span><button data-action="undo">Undo</button></div>
+
 <dialog id="type-dialog"><form id="type-form"></form></dialog>
+<dialog id="year-dialog" class="year-dialog"></dialog>
 
 <!-- Plain scripts, not modules: modules and fetch() are blocked on file:// -->
-<script src="icons.js?v=4.3"></script>
-<script src="data.js?v=4.3"></script>
-<script src="firebase-config.js?v=4.3"></script>
-<script src="app.js?v=4.3"></script>
-<script src="sync.js?v=4.3"></script>
+<script src="icons.js?v=4.4"></script>
+<script src="data.js?v=4.4"></script>
+<script src="firebase-config.js?v=4.4"></script>
+<script src="app.js?v=4.4"></script>
+<script src="sync.js?v=4.4"></script>
 </body>
 </html>

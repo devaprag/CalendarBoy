@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.3';
+const APP_VERSION = '4.4';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 const MAX_VISIBLE = 3;
@@ -88,7 +88,42 @@ function typeStats(t) {
     planned: month.filter(e => e.status === 'todo' && !isPast(e)).length,
     lastDone,
     nextDue: t.cycleDays && lastDone ? shiftKey(lastDone, t.cycleDays) : null,
+    ...streaks(t, all),
   };
+}
+
+// Streak = how many past events of a type in a row were done. Today's to-do doesn't break it (there's
+// still time). For repeat-cycle types, a gap longer than the cycle also breaks it, as does being overdue.
+function streaks(t, all) {
+  if (t.multiDay) return { streak: 0, bestStreak: 0 };
+  const past = all.filter(e => e.start <= today() && !(e.start === today() && e.status === 'todo'))
+    .sort((a, b) => a.start.localeCompare(b.start) || (a.time || '~').localeCompare(b.time || '~'));
+  let run = 0, best = 0, prev = null;
+  for (const e of past) {
+    if (e.status !== 'done') { run = 0; prev = null; continue; }
+    if (t.cycleDays && prev && dayDiff(prev, e.start) > t.cycleDays) run = 0;
+    run++;
+    prev = e.start;
+    best = Math.max(best, run);
+  }
+  if (t.cycleDays && prev && dayDiff(prev, today()) > t.cycleDays) run = 0;
+  return { streak: run, bestStreak: best };
+}
+
+// Repeat-cycle types that have been done before and have nothing planned get a faint "due" icon on the
+// day they're next due (today, if overdue). Returns day -> [type]. Hidden while Show done is on.
+function dueGhosts() {
+  const byDay = new Map();
+  if (state.settings.showDoneOnly) return byDay;
+  for (const t of state.types) {
+    if (!t.cycleDays || t.multiDay) continue;
+    const { nextDue } = typeStats(t);
+    if (!nextDue) continue;
+    if (scheduled().some(e => e.typeId === t.id && e.status === 'todo' && e.start >= today())) continue;
+    const k = nextDue < today() ? today() : nextDue;
+    byDay.set(k, [...(byDay.get(k) || []), t]);
+  }
+  return byDay;
 }
 
 // ---------- Elements ----------
@@ -110,6 +145,17 @@ function renderEvent(e) {
   return `<button class="event ${e.status}" data-id="${e.id}" data-drag="event" title="${esc(e.title)}">
     ${chip(typeOf(e))}<span class="label">${esc(e.title)}${e.time ? `<small>${esc(e.time)}</small>` : ''}</span>
   </button>`;
+}
+function renderGhost(t, k) {
+  const overdue = k === today() && typeStats(t).nextDue < today();
+  return `<button class="due${overdue ? ' overdue' : ''}" data-action="plan-due" data-type-id="${t.id}" data-date="${k}"
+      title="${esc(t.name)}: ${overdue ? 'overdue' : 'due'}. Tap to plan it.">
+    ${chip(t)}<span class="label">${esc(t.name)}<small>${overdue ? 'Overdue' : 'Due'}</small></span>
+  </button>`;
+}
+// Events then "due" ghosts for one day, as HTML items.
+function dayItems(k, ghosts) {
+  return [...eventsOn(k).map(renderEvent), ...(ghosts.get(k) || []).map(t => renderGhost(t, k))];
 }
 
 function render() {
@@ -144,6 +190,7 @@ function renderWeeks() {
   const gridStart = addDays(first, -first.getDay());
   const weekCount = Math.ceil((first.getDay() + new Date(y, m, 0).getDate()) / 7);
   const trips = scheduled().filter(e => e.end && !isHidden(e)).sort((a, b) => a.start.localeCompare(b.start));
+  const ghosts = dueGhosts();
   let html = '';
   for (let w = 0; w < weekCount; w++) {
     const weekStart = addDays(gridStart, w * 7);
@@ -162,14 +209,14 @@ function renderWeeks() {
     let cells = '';
     for (let i = 0; i < 7; i++) {
       const d = addDays(weekStart, i), k = key(d);
-      const evs = eventsOn(k);
-      const shown = evs.length > MAX_VISIBLE ? evs.slice(0, MAX_VISIBLE - 1) : evs;
-      const hidden = evs.length - shown.length;
+      const items = dayItems(k, ghosts);
+      const shown = items.length > MAX_VISIBLE ? items.slice(0, MAX_VISIBLE - 1) : items;
+      const hidden = items.length - shown.length;
       cells += `<div class="day${k.startsWith(viewMonth()) ? '' : ' other'}" data-drop="day" data-date="${k}">
         <div class="date${k === today() ? ' today' : ''}">${d.getDate()}</div>
         <div class="lane"></div>
         <div class="events">
-          ${shown.map(renderEvent).join('')}
+          ${shown.join('')}
           ${hidden ? `<button class="more" data-action="more" data-day="${k}">+${hidden} more</button>` : ''}
         </div>
       </div>`;
@@ -223,6 +270,7 @@ function renderTypes() {
           <button class="icon-btn" data-action="edit-type" data-type-id="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">&#9998;</button></div>
         ${t.goalPerMonth ? `<div class="progress"><span style="width:${pct}%"></span></div>` : ''}
         <div class="stat">${s.done}${t.goalPerMonth ? ` / ${t.goalPerMonth}` : ''} done · ${s.planned} planned</div>
+        ${s.streak >= 2 ? `<div class="stat streak" title="Done ${s.streak} times in a row">&#128293; ${s.streak} in a row${s.bestStreak > s.streak ? ` · best ${s.bestStreak}` : ''}</div>` : ''}
         <div class="stat">Last done ${s.lastDone ? fmtShort(s.lastDone) : '—'}</div>
         ${cycle}
       </div>
@@ -313,6 +361,61 @@ function removeEvent(id) {
   commit();
 }
 
+// ---------- Undo ----------
+// One level of undo, offered in a toast for a few seconds (or Ctrl+Z). It remembers the earlier version
+// of just the items a change touched, so changes synced in from another device meanwhile are kept.
+const UNDO_MS = 6000;
+const toastEl = $('toast');
+// { before: Map('events:id' | 'types:id' -> { json, i }, or null if the item was new), timer }
+let undo = null;
+
+function itemsSnapshot() {
+  const m = new Map();
+  for (const coll of ['types', 'events']) state[coll].forEach((x, i) => m.set(`${coll}:${x.id}`, { json: JSON.stringify(x), i }));
+  return m;
+}
+
+// Runs a change; fn returns the toast label.
+function undoable(fn) {
+  const before = itemsSnapshot();
+  const label = fn();
+  const after = itemsSnapshot();
+  const changed = new Map();
+  for (const [k, v] of before) if (after.get(k)?.json !== v.json) changed.set(k, v);
+  for (const k of after.keys()) if (!before.has(k)) changed.set(k, null);
+  if (!changed.size) return;
+  // More changes to the same items (like tapping through the statuses) undo back to where they started.
+  const same = undo && undo.before.size === changed.size && [...changed.keys()].every(k => undo.before.has(k));
+  clearTimeout(undo?.timer);
+  undo = { before: same ? undo.before : changed, timer: setTimeout(hideUndo, UNDO_MS) };
+  $('toast-text').textContent = label;
+  toastEl.hidden = false;
+}
+
+function applyUndo() {
+  if (!undo) return;
+  // New items go first, then the rest lowest index first, so removed items go back into their old places.
+  const entries = [...undo.before].sort((a, b) => (a[1]?.i ?? -1) - (b[1]?.i ?? -1));
+  for (const [k, old] of entries) {
+    const coll = k.slice(0, k.indexOf(':')), id = k.slice(coll.length + 1);
+    const list = state[coll], i = list.findIndex(x => x.id === id);
+    if (!old) { if (i !== -1) list.splice(i, 1); }
+    else if (i === -1) list.splice(Math.min(old.i, list.length), 0, JSON.parse(old.json));
+    else list[i] = JSON.parse(old.json);
+  }
+  hideUndo();
+  closePopover();
+  commit();
+}
+
+function hideUndo() {
+  clearTimeout(undo?.timer);
+  undo = null;
+  toastEl.hidden = true;
+}
+
+const statusLabel = id => `Marked ${STATUS_LABEL[byId(id).status].toLowerCase()}`;
+
 // ---------- Popover ----------
 let popoverView = null; // { kind: 'event', id } | { kind: 'day', day } | { kind: 'bin' }
 
@@ -375,8 +478,7 @@ function eventDetail(e) {
 }
 
 function dayList(k) {
-  const evs = eventsOn(k);
-  return `<p class="pop-heading">${fmtDate(k)}</p>${evs.map(renderEvent).join('') || '<p class="empty">Nothing here.</p>'}
+  return `<p class="pop-heading">${fmtDate(k)}</p>${dayItems(k, dueGhosts()).join('') || '<p class="empty">Nothing here.</p>'}
     <p class="hint">Tap to change status · long-press for details</p>`;
 }
 
@@ -393,8 +495,10 @@ function binList() {
 popover.addEventListener('change', ev => {
   const field = ev.target.dataset.field;
   if (!field || popoverView?.kind !== 'event') return;
-  const e = byId(popoverView.id);
-  const value = ev.target.value;
+  undoable(() => { editField(byId(popoverView.id), field, ev.target.value); return 'Changed'; });
+});
+
+function editField(e, field, value) {
   if (field === 'title') e.title = value.trim() || typeOf(e).name;
   else if (field === 'time' || field === 'notes') e[field] = value.trim();
   else if (field === 'start') {
@@ -410,7 +514,7 @@ popover.addEventListener('change', ev => {
     refreshPopover();
   }
   commit();
-});
+}
 
 // ---------- Type editor ----------
 let editingTypeId = null;
@@ -469,12 +573,62 @@ typeForm.addEventListener('submit', ev => {
 function deleteType(id) {
   const t = typeById(id);
   const n = state.events.filter(e => e.typeId === id).length;
-  if (!confirm(`Delete "${t.name}" and its ${n} event${n === 1 ? '' : 's'}? This can't be undone.`)) return;
-  state.types = state.types.filter(x => x.id !== id);
-  state.events = state.events.filter(e => e.typeId !== id);
-  typeDialog.close();
-  closePopover();
-  commit();
+  if (!confirm(`Delete "${t.name}" and its ${n} event${n === 1 ? '' : 's'}?`)) return;
+  undoable(() => {
+    state.types = state.types.filter(x => x.id !== id);
+    state.events = state.events.filter(e => e.typeId !== id);
+    typeDialog.close();
+    closePopover();
+    commit();
+    return `Deleted "${t.name}"`;
+  });
+}
+
+// ---------- Year heatmap ----------
+// One grid per type up to today's week: a column per week, a row per weekday. A year on wide screens,
+// six months on phones so the squares stay big enough. Done = the type's colour, planned but not done = its tint.
+const yearDialog = $('year-dialog');
+const narrowScreen = window.matchMedia('(max-width: 800px)');
+
+function openYear() {
+  const weeks = narrowScreen.matches ? 26 : 53;
+  yearDialog.style.setProperty('--weeks', weeks);
+  yearDialog.innerHTML = yearHtml(weeks);
+  yearDialog.showModal();
+}
+
+function yearHtml(weeks) {
+  const end = parseDate(today());
+  const first = addDays(end, -end.getDay() - (weeks - 1) * 7); // a Sunday
+  const from = key(first), to = today();
+  const days = Array.from({ length: weeks * 7 }, (_, i) => key(addDays(first, i)));
+  const months = days.filter((k, i) => i % 7 === 0).map((k, w) =>
+    !w || k.slice(5, 7) === days[(w - 1) * 7].slice(5, 7) ? '' : `<span style="grid-column:${w + 1}">${parseDate(k).toLocaleDateString('en-GB', { month: 'short' })}</span>`).join('');
+  const types = state.types.filter(t => !t.multiDay);
+  const rows = types.map(t => {
+    const evs = scheduled().filter(e => e.typeId === t.id && e.start >= from && e.start <= to);
+    const done = new Map(), missed = new Set();
+    evs.forEach(e => e.status === 'done' ? done.set(e.start, (done.get(e.start) || 0) + 1) : missed.add(e.start));
+    const total = [...done.values()].reduce((a, b) => a + b, 0);
+    const cells = days.map(k => {
+      if (k > to) return '<i class="future"></i>';
+      const n = done.get(k);
+      const cls = n ? 'done' : missed.has(k) ? 'missed' : '';
+      return `<i class="${cls}" title="${fmtDate(k)}${n ? `: done${n > 1 ? ` ×${n}` : ''}` : missed.has(k) ? ': not done' : ''}"></i>`;
+    }).join('');
+    const { bestStreak } = typeStats(t);
+    return `<div class="heat-type" style="${colorVars(t)}">
+      <div class="heat-head">${chip(t)}<span class="heat-name">${esc(t.name)}</span>
+        <span class="stat">${total} done${bestStreak >= 2 ? ` · best streak ${bestStreak}` : ''}</span></div>
+      <div class="heat-months">${months}</div><div class="heat">${cells}</div>
+    </div>`;
+  }).join('');
+  const fmtYear = k => parseDate(k).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `<h2>The last ${weeks > 26 ? '12' : '6'} months</h2>
+    <p class="hint">${fmtYear(from)} – ${fmtYear(to)}. One square per day, a column per week.
+      <span class="heat-key"><i class="done"></i> done <i class="missed"></i> planned, not done</span></p>
+    ${rows || '<p class="empty">No event types yet.</p>'}
+    <div class="dialog-actions"><span class="spacer"></span><button type="button" class="btn" data-action="close-year">Close</button></div>`;
 }
 
 // ---------- Data: export / import / reset ----------
@@ -496,6 +650,7 @@ importInput.addEventListener('change', () => {
       const data = migrate(JSON.parse(reader.result));
       if (!isValidState(data)) throw new Error('bad shape');
       state = data;
+      hideUndo();
       closePopover();
       commit();
     } catch (err) {
@@ -512,6 +667,7 @@ const ALSO_IN_ACCOUNT = () => (syncAccount ? '\n\nThis also replaces the calenda
 function resetData() {
   if (!confirm('Replace everything with the demo data?' + ALSO_IN_ACCOUNT())) return;
   state = structuredClone(SEED);
+  hideUndo();
   closePopover();
   commit();
 }
@@ -520,6 +676,7 @@ function resetData() {
 function startFresh() {
   if (!confirm('Start fresh? All events are deleted (event types are kept) and today becomes the real date.' + ALSO_IN_ACCOUNT())) return;
   state.events = [];
+  hideUndo();
   setToday(null);
 }
 
@@ -536,16 +693,23 @@ const ACTIONS = {
   more: el => showPopover({ kind: 'day', day: el.dataset.day }, el),
   'open-bin': el => showPopover({ kind: 'bin' }, el),
   'close-popover': closePopover,
-  'set-status': el => { setStatus(popoverView.id, el.dataset.status); refreshPopover(); },
-  duplicate: () => duplicateEvent(popoverView.id),
-  remove: () => removeEvent(popoverView.id),
-  restore: el => { byId(el.dataset.id).deletedAt = null; commit(); refreshPopover(); },
-  'empty-bin': () => {
-    if (!confirm('Permanently delete everything in the bin?')) return;
-    state.events = state.events.filter(e => !e.deletedAt);
-    commit();
+  'set-status': el => {
+    const id = popoverView.id;
+    undoable(() => { setStatus(id, el.dataset.status); return statusLabel(id); });
     refreshPopover();
   },
+  duplicate: () => undoable(() => { duplicateEvent(popoverView.id); return 'Duplicated'; }),
+  remove: () => undoable(() => { removeEvent(popoverView.id); return 'Moved to the bin'; }),
+  restore: el => { undoable(() => { byId(el.dataset.id).deletedAt = null; commit(); return 'Restored'; }); refreshPopover(); },
+  'empty-bin': () => {
+    if (!confirm('Permanently delete everything in the bin?')) return;
+    undoable(() => { state.events = state.events.filter(e => !e.deletedAt); commit(); return 'Bin emptied'; });
+    refreshPopover();
+  },
+  'plan-due': el => undoable(() => { addEvent(typeById(el.dataset.typeId), el.dataset.date); return 'Planned'; }),
+  undo: applyUndo,
+  'open-year': openYear,
+  'close-year': () => yearDialog.close(),
   'prev-month': () => changeMonth(-1),
   'next-month': () => changeMonth(1),
   'go-today': () => goToMonth(today().slice(0, 7)),
@@ -579,7 +743,8 @@ document.addEventListener('click', ev => {
   const item = ev.target.closest('.event, .trip');
   if (item) {
     if (!popover.contains(item)) closePopover();
-    cycleStatus(item.dataset.id);
+    const id = item.dataset.id;
+    undoable(() => { cycleStatus(id); return statusLabel(id); });
     return;
   }
   if (!popover.contains(ev.target)) closePopover();
@@ -597,6 +762,11 @@ document.addEventListener('contextmenu', ev => {
 
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape') { endDrag(); press = null; closePopover(); }
+  // Ctrl+Z undoes the last change while its toast shows; inside a text field it's the field's own undo.
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z' && undo && !ev.target.closest?.('input, textarea')) {
+    ev.preventDefault();
+    applyUndo();
+  }
 });
 
 // Only width changes: on phones the on-screen keyboard changes the height while editing popup fields.
@@ -790,7 +960,7 @@ document.addEventListener('pointerup', ev => {
       const p = press, target = dropTargetAt(ev.clientX, ev.clientY);
       endDrag();
       suppressClick = true;
-      if (target) drop(p, target, ev.clientX, ev.clientY);
+      if (target) undoable(() => drop(p, target, ev.clientX, ev.clientY));
     }
     press = null;
   }
@@ -865,7 +1035,7 @@ function drop(p, target, x, y) {
     const type = typeById(p.src.dataset.typeId);
     if (kind === 'day') addEvent(type, target.dataset.date);
     else if (kind === 'backlog') addEvent(type, null, beforeId);
-    return;
+    return 'Added';
   }
   const e = byId(p.src.dataset.id);
   if (!e) return;
@@ -878,6 +1048,7 @@ function drop(p, target, x, y) {
     else moveTo(e, shiftKey(k, -p.offset));
   }
   commit();
+  return kind === 'bin' ? 'Moved to the bin' : kind === 'backlog' ? 'Moved to the backlog' : 'Moved';
 }
 
 // ---------- Start ----------

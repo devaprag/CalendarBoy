@@ -44,13 +44,14 @@ The owner is building it for fun and tests it on a Samsung phone as well as a PC
   1. State and storage, including `migrate()` from older formats.
   2. Date helpers, including month helpers.
   3. Queries.
-  4. Render: the header bits, the shelf (lock, palette, backlog), the types sidebar, the month grid with trip lanes, and the bin.
-  5. Event changes.
+  4. Render: the header bits, the shelf (lock, palette, backlog), the types sidebar, the month grid with trip lanes and due ghosts, and the bin.
+  5. Event changes, then Undo (`undoable(fn)` wraps a change; `fn` returns the toast label).
   6. Popover.
   7. Type editor.
-  8. Export / import / reset.
-  9. Clicks (the `ACTIONS` table).
-  10. Press handling: tap, long-press, drag.
+  8. Year heatmap.
+  9. Export / import / reset.
+  10. Clicks (the `ACTIONS` table).
+  11. Press handling: tap, long-press, drag.
 
 ## Data model
 Stored in localStorage key `calendarBoy.v1`. The key name is historical; the object carries `version`. Export uses the same JSON shape.
@@ -103,7 +104,11 @@ Decided with the owner. Keep these unless the owner changes them.
 | "Today" | The **"Today is" date picker** sets a pretend today (default 18 Jan 2027, so the playground has a past). Data → "Use the real date as today". |
 | Show done filter | Shows **only done** events, past and future alike. To do and abandoned are hidden. The backlog is unaffected. |
 | Sidebar | Event types with **counts for the month on screen** (`5 / 12 done · 4 planned`, plus a progress bar when there's a goal), last done, and repeat cycle / next due / **overdue** (red). On phones it sits below the calendar and **collapses/expands** by tapping its heading (`settings.statsCollapsed`, remembered; expanded by default). On desktop it is always open. |
-| Deleting a type | Deletes all its events permanently, after a confirm showing the count. |
+| Streaks | Sidebar line `🔥 3 in a row · best 6`, shown from 2. A streak counts past events of a type that were done in a row. A to do or abandoned one breaks it, except **today's to do** (there's still time). For repeat-cycle types, a gap longer than the cycle also breaks it, and so does being overdue. Trips have no streak. |
+| Due ghosts | For a repeat-cycle type that has been done and has **no to do planned from today on**: a faint dashed icon on the next-due day, or on **today in red** if overdue. Tapping it adds a To do there. Ghosts count towards a day's visible items, and are hidden while Show done is on. |
+| Undo | One level. Status taps, drops, popup edits, Duplicate, Remove, Restore, Empty bin, planning a ghost and deleting a type show a toast with **Undo** for 6s (Ctrl+Z too, outside text fields). Repeated changes to the same items (tapping through statuses) undo back to where they started. Reset, Start fresh and Import clear it. |
+| Year view | The **Year** button in the sidebar heading opens a heatmap per single-day type: a column per week, a row per weekday, up to today's week. 53 weeks on desktop, 26 on phones (no sideways scrolling). Done = type colour, planned but not done = tint. |
+| Deleting a type | Deletes all its events, after a confirm showing the count. Undo brings them back. |
 | Other | The recycling bin (bottom right) restores items or empties. Data menu: sync status + Sign in/out, Use the real date, **Start fresh** (empty calendar, keeps types, real date), Export / Import JSON, Reset demo data. |
 
 ## Conventions
@@ -124,6 +129,8 @@ Decided with the owner. Keep these unless the owner changes them.
 - The Data menu shows `Version x` from `app.js`, so the owner can check which code their phone is running. If the menu says "Old app.js still cached", the HTML and JS are out of step.
 
 ## Gotchas (don't reintroduce)
+- **Undo is item-level**: `undoable()` snapshots each type/event as JSON before and after, and keeps the old JSON (and array index) of only the items that changed. Undo puts those back, so changes synced in from another device meanwhile survive. New user-facing changes should go through `undoable()`.
+- **Due ghosts** are `.due` buttons, **not** `.event`: they have no `data-id`, and `.event` code (status cycling, context menu, drag) would break on them.
 - **Status changes update classes in place** (`setStatus`) and re-render only the sidebar. The icon stays put while you cycle it, even if Show done would now hide it.
 - **Press handling** (`pointerdown` → `press`):
   - Moving more than 6px starts a drag, or does nothing when locked, so the browser scrolls.
@@ -152,7 +159,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (73 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (96 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.

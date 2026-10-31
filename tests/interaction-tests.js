@@ -166,6 +166,67 @@ function dragTo(src, target, from, to) {
     ok('gym goal line', rows[2].includes('/ 12 done'), rows[2]);
     ok('bedsheets overdue', rows[5].includes('overdue since 17 Jan'), rows[5]);
 
+    // Streaks: done in a row; a not-done event breaks it; today's to-do doesn't
+    state.types.push({ id: 'tst', name: 'Test habit', icon: 'book', color: 'yellow', goalPerMonth: null, cycleDays: null });
+    const mk = (start, status) => state.events.push({ id: 'tst-' + start, typeId: 'tst', title: 'T', start, end: null, time: '', notes: '', status, deletedAt: null, seq: 0 });
+    [['2027-01-05', 'done'], ['2027-01-06', 'done'], ['2027-01-07', 'done'], ['2027-01-08', 'abandoned'],
+      ['2027-01-10', 'done'], ['2027-01-12', 'done'], ['2027-01-18', 'todo'], ['2027-01-20', 'todo']].forEach(a => mk(...a));
+    render();
+    const tstRow = () => [...document.querySelectorAll('.type-row')].pop().textContent.replace(/\s+/g, ' ');
+    ok('streak with best', tstRow().includes('2 in a row · best 3'), tstRow());
+    byId('tst-2027-01-18').status = 'abandoned'; render();
+    ok('a not-done event breaks the streak', !tstRow().includes('in a row'), tstRow());
+    byId('tst-2027-01-18').status = 'todo';
+    typeById('tst').cycleDays = 2; render();
+    ok('overdue cycle type has no streak', !tstRow().includes('in a row'), tstRow());
+    ok('planned cycle type has no due ghost', !q('.due[data-type-id="tst"]'));
+
+    // "Due" ghosts: overdue -> today, red; otherwise on the due day; tap plans a to-do there (undoable)
+    byId('tst-2027-01-18').status = 'abandoned'; byId('tst-2027-01-20').status = 'abandoned'; render();
+    ok('overdue ghost on today', !!day('2027-01-18').querySelector('.due.overdue[data-type-id="tst"]'));
+    typeById('tst').cycleDays = 10; render();
+    const ghost = day('2027-01-22').querySelector('.due[data-type-id="tst"]');
+    ok('due ghost on the due day', !!ghost && !ghost.classList.contains('overdue') && !q('.due.overdue'));
+    click(q('#filter-btn'));
+    ok('Show done hides ghosts', !q('.due'));
+    click(q('#filter-btn'));
+    click(day('2027-01-22').querySelector('.due[data-type-id="tst"]'));
+    const planned = state.events.find(e => e.typeId === 'tst' && e.start === '2027-01-22');
+    ok('tapping a ghost plans it', !!planned && planned.status === 'todo' && !!elOf(planned) && !q('.due[data-type-id="tst"]'));
+    ok('undo toast shows', !q('#toast').hidden && q('#toast-text').textContent === 'Planned');
+    click(q('[data-action="undo"]'));
+    ok('undo removes the planned event', !state.events.some(e => e.typeId === 'tst' && e.start === '2027-01-22') && !!q('.due[data-type-id="tst"]') && q('#toast').hidden);
+    state.types = state.types.filter(t => t.id !== 'tst'); state.events = state.events.filter(e => e.typeId !== 'tst'); render();
+
+    // Undo: status taps undo back to where they started; remove; Ctrl+Z; delete type
+    const cin = find('2027-01-22', 'Cinema with Alex');
+    click(elOf(cin)); click(elOf(cin));
+    ok('toast names the change', q('#toast-text').textContent === 'Marked abandoned');
+    click(q('[data-action="undo"]'));
+    ok('undo after two taps restores to do', byId(cin.id).status === 'todo' && elOf(byId(cin.id)).classList.contains('todo'));
+    elOf(byId(cin.id)).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    click(q('[data-action="remove"]'));
+    ok('remove offers undo', !!byId(cin.id).deletedAt && q('#toast-text').textContent === 'Moved to the bin');
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+    ok('Ctrl+Z undoes', !byId(cin.id).deletedAt && !!elOf(byId(cin.id)) && q('#bin-badge').hidden);
+    const movieCount = state.events.filter(e => e.typeId === 'movie').length, movieIdx = state.types.findIndex(t => t.id === 'movie');
+    click(q('[data-action="edit-type"][data-type-id="movie"]'));
+    click(q('[data-action="delete-type"]'));
+    ok('type deleted', !typeById('movie'));
+    click(q('[data-action="undo"]'));
+    ok('undo restores a deleted type in place, with its events', state.types.findIndex(t => t.id === 'movie') === movieIdx
+      && state.events.filter(e => e.typeId === 'movie').length === movieCount && !!elOf(find('2027-01-22', 'Cinema with Alex')));
+
+    // Year heatmap
+    click(q('[data-action="open-year"]'));
+    const gymDone = state.events.filter(e => e.typeId === 'gym' && e.status === 'done' && e.start <= today()).length;
+    const gymHeat = [...document.querySelectorAll('.heat-type')].find(el => el.textContent.includes('Gym'));
+    ok('year view: one heatmap per single-day type', yearDialog.open && document.querySelectorAll('.heat-type').length === state.types.filter(t => !t.multiDay).length);
+    ok('year view: done days coloured', gymHeat.querySelectorAll('.heat i.done').length === gymDone && gymHeat.querySelectorAll('.heat i').length === 53 * 7, gymHeat.querySelectorAll('.heat i.done').length + ' vs ' + gymDone);
+    ok('year view: missed days marked', gymHeat.querySelectorAll('.heat i.missed').length > 0);
+    click(q('[data-action="close-year"]'));
+    ok('year view closes', !yearDialog.open);
+
     // Type editor
     click(q('[data-action="add-type"]'));
     click(q('[data-action="preset"][data-preset="1"]'));

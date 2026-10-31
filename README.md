@@ -23,7 +23,11 @@ Open `index.html` in a browser. There's nothing to install and no build step. Yo
 - The sidebar shows, for each event type:
   - its **goal** for the month (e.g. `5 / 12 done · 4 planned`);
   - when it was **last done**;
-  - when it's **next due**, if it repeats.
+  - when it's **next due**, if it repeats;
+  - its **streak** (🔥 `3 in a row`): past events done in a row.
+- **Due ghosts**: a repeating type with nothing planned shows a faint dashed icon on the day it's next due (red, on today, if overdue). Tap it to plan it.
+- **Undo**: most changes show an **Undo** toast for a few seconds (or press Ctrl+Z).
+- **Year** (sidebar): a heatmap per event type of the days it was done over the last 12 months (6 on a phone).
 - **+ Add** creates an event type from a preset or your own name, icon and colour. The pencil edits a type.
 - **Data**: export or import a JSON backup, reset to the demo data, or switch to the real date.
 

@@ -107,11 +107,11 @@ header h1 { margin: 0 0 0 4px; font-size: 22px; font-weight: 400; white-space: n
 /* ---------- Layout ---------- */
 .app { display: flex; min-height: calc(100vh - 57px); }
 aside { width: 270px; flex-shrink: 0; padding: 12px 16px 100px; }
-.side-head { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; }
+.side-head { display: flex; align-items: center; gap: 6px; margin: 8px 0; }
 aside h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .side-toggle {
   display: flex; align-items: center; gap: 6px;
-  padding: 4px 0; border: 0; background: none; pointer-events: none; /* only a control on phones */
+  margin-right: auto; padding: 4px 0; border: 0; background: none; pointer-events: none; /* only a control on phones */
 }
 .side-toggle .chevron { display: none; color: var(--muted); }
 .shelf-add { display: none; }
@@ -128,6 +128,7 @@ main {
 .type-name { display: flex; align-items: center; justify-content: space-between; gap: 4px; font-weight: 500; }
 .stat { margin-top: 2px; font-size: 12px; color: var(--muted); }
 .stat.overdue { color: var(--danger); font-weight: 600; }
+.stat.streak { color: #c2410c; font-weight: 600; }
 .progress { height: 6px; margin-top: 4px; border-radius: 3px; background: var(--hover); overflow: hidden; }
 .progress span { display: block; height: 100%; background: var(--c); }
 
@@ -199,15 +200,21 @@ main {
 .abandoned .chip { filter: grayscale(1); opacity: .4; }
 .abandoned .label { color: var(--muted); }
 
-.event {
+.event, .due {
   display: flex; align-items: center; gap: 8px;
   width: 100%; padding: 4px; margin-bottom: 2px;
   border: 0; background: transparent; border-radius: 8px;
   text-align: left; cursor: pointer;
 }
-.event:hover, .more:hover { background: var(--hover); }
-.event .label { min-width: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.event .label small { display: block; font-size: 11px; color: var(--muted); }
+.event:hover, .due:hover, .more:hover { background: var(--hover); }
+.event .label, .due .label { min-width: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event .label small, .due .label small { display: block; font-size: 11px; color: var(--muted); }
+/* "Due" ghost of a repeat-cycle type: a faint dashed outline, red when overdue. */
+.due .chip { background: transparent; outline: 2px dashed var(--c); outline-offset: -2px; }
+.due .chip svg { opacity: .4; }
+.due .label { color: var(--muted); font-style: italic; }
+.due.overdue .chip { outline-color: var(--danger); }
+.due.overdue .label small { color: var(--danger); }
 .more {
   padding: 2px 6px; border: 0; background: transparent; border-radius: 6px;
   font-size: 12px; font-weight: 600; cursor: pointer;
@@ -286,6 +293,40 @@ body:not(.locked) [data-drag] { touch-action: none; cursor: grab; }
 .pop-actions { display: flex; gap: 8px; margin-top: 6px; }
 .pop-heading { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
 
+/* ---------- Undo toast ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; z-index: 30; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 32px);
+  padding: 10px 10px 10px 16px; border-radius: 8px;
+  background: #323232; color: #fff; font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.3);
+}
+.toast[hidden] { display: none; }
+.toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast button {
+  flex-shrink: 0; padding: 6px 10px; border: 0; border-radius: 6px;
+  background: transparent; color: #8ab4f8; font-weight: 600; cursor: pointer;
+}
+.toast button:hover { background: rgba(255,255,255,.1); }
+
+/* ---------- Year heatmap ---------- */
+.year-dialog { width: 760px; }
+.heat-key { white-space: nowrap; }
+.heat-key i { display: inline-block; width: 10px; height: 10px; margin: 0 2px 0 8px; border-radius: 2px; vertical-align: -1px; background: var(--muted); }
+.heat-key i.missed { background: var(--line); }
+.heat-type { margin-bottom: 14px; }
+.heat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.heat-head .chip { width: 26px; height: 26px; border-radius: 7px; }
+.heat-name { font-weight: 500; }
+.heat-head .stat { margin: 0 0 0 auto; }
+.heat-months, .heat { display: grid; grid-template-columns: repeat(var(--weeks), minmax(0, 1fr)); gap: 2px; }
+.heat-months { height: 14px; font-size: 10px; color: var(--muted); }
+.heat-months span { white-space: nowrap; }
+.heat { grid-template-rows: repeat(7, auto); grid-auto-flow: column; }
+.heat i { aspect-ratio: 1; border-radius: 2px; background: var(--hover); }
+.heat i.done { background: var(--c); }
+.heat i.missed { background: var(--tint); box-shadow: inset 0 0 0 1px var(--c); opacity: .6; }
+.heat i.future { background: transparent; }
+
 /* ---------- Type editor dialog ---------- */
 dialog {
   width: 540px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px);
@@ -345,8 +386,10 @@ dialog h2 { margin: 0 0 12px; font-size: 18px; font-weight: 500; }
   .week { min-height: 96px; }
   .day { padding: 2px; }
   .day .events { display: flex; flex-wrap: wrap; gap: 3px; }
-  .day .event { width: auto; padding: 2px; margin: 0; }
-  .day .event .label { display: none; }
+  .day .event, .day .due { width: auto; padding: 2px; margin: 0; }
+  .day .event .label, .day .due .label { display: none; }
+  .toast { bottom: 80px; }
+  .year-dialog { padding: 16px; }
   .day .chip { width: 26px; height: 26px; border-radius: 7px; }
   .lane { height: calc(var(--lanes, 0) * 34px); }
   .trip { top: calc(28px + var(--lane) * 34px); height: 30px; }
