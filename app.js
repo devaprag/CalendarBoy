@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '3.3';
+const APP_VERSION = '3.4';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 2;
 const MAX_VISIBLE = 3;
@@ -620,7 +620,9 @@ function slideMonth(snapshot, dir, axis) {
   weeksEl.after(snapshot);
   const move = pct => `translate${axis.toUpperCase()}(${pct}%)`;
   const timing = { duration: SLIDE_MS, easing: 'cubic-bezier(.2, .7, .3, 1)' };
-  snapshot.animate([{ transform: move(0), opacity: 1 }, { transform: move(-dir * 100), opacity: 0.3 }], timing);
+  // fill: 'forwards' holds the copy off-screen after the slide ends; without it the copy snaps back over
+  // the new month until the timer removes it, which shows as a flicker of the old icons.
+  snapshot.animate([{ transform: move(0), opacity: 1 }, { transform: move(-dir * 100), opacity: 0 }], { ...timing, fill: 'forwards' });
   // A timer rather than onfinish: paused animations (background tab) would otherwise leave the copy behind.
   setTimeout(() => snapshot.remove(), SLIDE_MS + 50);
   weeksEl.animate([{ transform: move(dir * 100) }, { transform: move(0) }], timing);

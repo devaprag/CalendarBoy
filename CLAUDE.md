@@ -125,6 +125,7 @@ Decided with the owner. Keep these unless the owner changes them.
   - Before re-rendering, a clone of `#weeks` is taken. It is made lifeless: `inert`, `pointer-events: none`, and the `data-id`/`data-drop`/`data-drag`/`data-action` attributes are stripped, so queries, drops and clicks never hit it.
   - The clone slides out over the new grid inside `.weeks-wrap` (`overflow: hidden`).
   - It is removed by a **timer**, not `onfinish`. Paused animations (background tabs, headless tests) would otherwise leave it behind.
+  - The clone's animation **must keep `fill: 'forwards'`** and end at opacity 0. Otherwise it snaps back over the new month between the end of the slide and the timer, which the owner saw as an icon flicker.
   - Any month change must go through `goToMonth()`.
 - **Popup and resize**: the popup closes on resize only if the **width** changes. The phone keyboard changes the height while editing.
 - **Layout**:
@@ -133,7 +134,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (49 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (50 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.

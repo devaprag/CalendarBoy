@@ -136,6 +136,8 @@ function dragTo(src, target, from, to) {
     click(q('[data-action="next-month"]'));
     const leaving = q('.weeks-leaving');
     ok('old month snapshot slides away', !!leaving && !leaving.querySelector('[data-id], [data-drop]') && leaving.inert);
+    const slide = leaving.getAnimations()[0]?.effect;
+    ok('snapshot stays hidden after its slide (no flicker)', slide?.getTiming().fill === 'forwards' && slide.getKeyframes().pop().opacity === '0');
     ok('new month rendered underneath', q('#month-title').textContent === 'February 2027' && !!day('2027-02-13'));
     await sleep(SLIDE_MS + 150);
     ok('snapshot removed after the slide', !q('.weeks-leaving'));
