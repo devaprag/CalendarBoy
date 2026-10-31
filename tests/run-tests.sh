@@ -16,7 +16,8 @@ sed -e "s#href=\"styles.css\"#href=\"$URL_ROOT/styles.css\"#" \
     "$ROOT/index.html" > "$TMP/harness.html"
 
 # Fresh profile each run, so localStorage starts empty and the app loads SEED.
-"$EDGE" --headless=new --disable-gpu --user-data-dir="$TMP/profile" --window-size=1440,1300 \
+# Virtual time lets the async tests (long-press waits) finish before the DOM is dumped.
+"$EDGE" --headless=new --disable-gpu --user-data-dir="$TMP/profile" --window-size=1440,1300 --virtual-time-budget=10000 \
   --dump-dom "file:///$TMP/harness.html" 2>/dev/null \
   | sed -n '/<pre/,/<\/pre>/p' | sed -e 's#<[^>]*>##g' > "$TMP/out.txt"
 

@@ -39,49 +39,76 @@ const PRESET_TYPES = [
   { name: 'Walk the dog',   icon: 'paw',            color: 'yellow', goalPerMonth: null, cycleDays: 1 },
 ];
 
-function seedEvent(id, typeId, start, title, time, done, notes = '', end = null) {
-  return { id, typeId, title, start, end, time, notes, done, deletedAt: null };
-}
 
-// Demo data. Pretend-today is 18 Jan, so the first half of the month has done / not-done history.
-const SEED = {
-  version: 1,
-  settings: { pretendToday: '2027-01-18', showDoneOnly: false },
-  types: [
-    { id: 'movie',     name: 'Movie',            icon: 'camera',       color: 'purple', goalPerMonth: 4,    cycleDays: null },
-    { id: 'holiday',   name: 'Overseas holiday', icon: 'planeTakeoff', endIcon: 'planeLanding', multiDay: true, color: 'sky', goalPerMonth: null, cycleDays: null },
-    { id: 'gym',       name: 'Gym',              icon: 'dumbbell',     color: 'orange', goalPerMonth: 10,   cycleDays: null },
-    { id: 'shopping',  name: 'Shopping',         icon: 'bag',          color: 'pink',   goalPerMonth: null, cycleDays: null },
-    { id: 'call',      name: 'Call friend',      icon: 'phone',        color: 'green',  goalPerMonth: null, cycleDays: 7 },
-    { id: 'bedsheets', name: 'Wash bedsheets',   icon: 'bed',          color: 'teal',   goalPerMonth: null, cycleDays: 14 },
-  ],
-  events: [
-    seedEvent('e1',  'call',      '2027-01-01', 'New Year call with Sam', '11:00', true,  'Wish Sam a happy new year and hear about the party.'),
-    seedEvent('e2',  'shopping',  '2027-01-02', 'January sales',          '10:00', true,  'New running shoes and a winter coat.'),
-    seedEvent('e3',  'movie',     '2027-01-02', 'Cinema: new release',    '19:30', true,  'Screen 4. Booked seats G12–G13.'),
-    seedEvent('e4',  'bedsheets', '2027-01-03', 'Wash bedsheets',         '',      true),
-    seedEvent('e5',  'gym',       '2027-01-04', 'Gym: legs',              '07:00', true,  'Squats, lunges, leg press.'),
-    seedEvent('e6',  'gym',       '2027-01-06', 'Gym: upper body',        '07:00', true,  'Bench, rows, shoulder press.'),
-    seedEvent('e7',  'gym',       '2027-01-08', 'Gym: cardio',            '07:00', false, '30 min intervals on the bike.'),
-    seedEvent('e8',  'shopping',  '2027-01-09', 'Travel adapters',        '14:00', true,  'Type A plug adapters, sunscreen, travel pillow.'),
-    seedEvent('e9',  'call',      '2027-01-09', 'Call Mum',               '18:00', true,  'Share the trip itinerary.'),
-    seedEvent('e10', 'gym',       '2027-01-11', 'Gym: full body',         '07:00', true,  'Last session before the trip.'),
-    seedEvent('e11', 'gym',       '2027-01-13', 'Gym: stretch',           '07:00', false, 'Light yoga and mobility.'),
-    seedEvent('e12', 'shopping',  '2027-01-13', 'Last-minute packing',    '12:00', true,  'Toiletries and snacks for the flight.'),
-    seedEvent('e13', 'call',      '2027-01-13', 'Call Priya',             '18:00', true,  'Ask her to water the plants while I am away.'),
-    seedEvent('e14', 'movie',     '2027-01-13', 'Movie night at home',    '20:30', false, 'Something light before an early flight.'),
-    seedEvent('e15', 'holiday',   '2027-01-14', 'Trip to Tokyo',          'Departs 09:15 · Lands 16:40', true, 'Flight out on the 14th, home on the 20th. Hotel in Shinjuku.', '2027-01-20'),
-    seedEvent('e16', 'bedsheets', '2027-01-17', 'Wash bedsheets',         '',      false, 'Away in Tokyo, so this one slipped.'),
-    seedEvent('e17', 'movie',     '2027-01-22', 'Cinema with Alex',       '20:00', false, 'Alex is choosing the film this time.'),
-    seedEvent('e18', 'call',      '2027-01-23', 'Catch-up with Jo',       '15:00', false, 'Tell Jo all about Tokyo.'),
-    seedEvent('e19', 'bedsheets', '2027-01-24', 'Wash bedsheets',         '',      false),
-    seedEvent('e20', 'gym',       '2027-01-25', 'Gym: back on it',        '07:00', false, 'Easy session after the holiday.'),
-    seedEvent('e21', 'gym',       '2027-01-27', 'Gym: upper body',        '07:00', false),
-    seedEvent('e22', 'gym',       '2027-01-29', 'Gym: cardio',            '07:00', false),
-    seedEvent('e23', 'shopping',  '2027-01-30', 'Weekly groceries',       '10:00', false, 'Fruit, veg, coffee beans.'),
-    seedEvent('e24', 'call',      '2027-01-31', 'Sunday call with Gran',  '17:00', false),
-    seedEvent('e25', 'movie',     null,         "Watch the director's cut", '',    false),
-    seedEvent('e26', 'shopping',  null,         'Buy new trainers',       '',      false),
-    seedEvent('e27', 'call',      null,         'Video call with cousins', '',     false),
-  ],
-};
+// Demo data for the Nov 2026 – Mar 2027 playground. Pretend-today is 18 Jan 2027, so earlier
+// events have done / to-do / abandoned history and later ones are plans.
+const SEED = (() => {
+  const TODAY = '2027-01-18';
+  const keyOf = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const TRIPS = [
+    ['2026-12-23', '2026-12-28', 'Christmas in Lisbon', 'Out 08:40 · Back 19:10', 'Family Christmas. Pack the presents!'],
+    ['2027-01-14', '2027-01-20', 'Trip to Tokyo', 'Departs 09:15 · Lands 16:40', 'Hotel in Shinjuku.'],
+    ['2027-03-13', '2027-03-20', 'Ski week in the Alps', 'Departs 07:30', 'Ski hire booked for six days.'],
+  ];
+  const away = k => TRIPS.some(([from, to]) => k >= from && k <= to);
+  const events = [];
+  const add = (typeId, start, title, time, status, notes = '', end = null) =>
+    events.push({ id: 'e' + (events.length + 1), typeId, title, start, end, time, notes, status, deletedAt: null });
+  // Past routine events are mostly done; a fixed pattern marks a few as missed (to do) or abandoned.
+  const status = (k, i, todoEvery, abandonEvery) => k > TODAY ? 'todo'
+    : (i + 3) % todoEvery === 0 ? 'todo' : (i + 2) % abandonEvery === 0 ? 'abandoned' : 'done';
+
+  const GYM = ['Gym: legs', 'Gym: upper body', 'Gym: cardio'];
+  let gym = 0, shop = 0, call = 0;
+  for (let d = new Date(2026, 10, 1); d <= new Date(2027, 2, 31); d.setDate(d.getDate() + 1)) {
+    const k = keyOf(d), dow = d.getDay();
+    if (away(k)) continue;
+    if (dow === 1 || dow === 3 || dow === 5) add('gym', k, GYM[gym % 3], '07:00', status(k, gym++, 7, 11));
+    if (dow === 6) add('shopping', k, 'Weekly groceries', '10:00', status(k, shop++, 9, 5));
+    if (dow === 0) add('call', k, 'Sunday call with Gran', '17:00', status(k, call++, 6, 13));
+  }
+  // Every two weeks; the ones that fall during a trip were missed, so bedsheets end up overdue on 18 Jan.
+  for (let d = new Date(2026, 10, 8); d <= new Date(2027, 2, 31); d.setDate(d.getDate() + 14)) {
+    const k = keyOf(d);
+    add('bedsheets', k, 'Wash bedsheets', '', k <= TODAY && !away(k) ? 'done' : 'todo');
+  }
+  TRIPS.forEach(([from, to, title, time, notes]) => add('holiday', from, title, time, from <= TODAY ? 'done' : 'todo', notes, to));
+  [
+    ['movie',    '2026-11-07', 'Cinema: autumn blockbuster', '19:30', 'done', 'Screen 2.'],
+    ['call',     '2026-11-19', 'Call Sam',                   '18:30', 'done'],
+    ['movie',    '2026-11-21', 'Movie night at home',        '20:00', 'todo', 'Fell asleep on the sofa instead.'],
+    ['shopping', '2026-11-27', 'Black Friday deals',         '09:00', 'abandoned', "Decided I didn't need anything."],
+    ['shopping', '2026-12-12', 'Christmas presents',         '11:00', 'done', 'Gran, Mum, Sam, Priya.'],
+    ['movie',    '2026-12-18', 'Christmas movie night',      '20:00', 'done'],
+    ['call',     '2026-12-31', "New Year's Eve call with Sam", '23:30', 'done'],
+    ['movie',    '2027-01-02', 'Cinema: new release',        '19:30', 'done', 'Booked seats G12–G13.'],
+    ['shopping', '2027-01-09', 'Travel adapters',            '14:00', 'done', 'Type A plugs, sunscreen, travel pillow.'],
+    ['call',     '2027-01-09', 'Call Mum',                   '18:00', 'done', 'Share the Tokyo itinerary.'],
+    ['shopping', '2027-01-13', 'Last-minute packing',        '12:00', 'done'],
+    ['call',     '2027-01-13', 'Call Priya',                 '18:00', 'done', 'Ask her to water the plants.'],
+    ['movie',    '2027-01-13', 'Movie night at home',        '20:30', 'abandoned', 'Early flight, so skipped it.'],
+    ['movie',    '2027-01-22', 'Cinema with Alex',           '20:00', 'todo', 'Alex is choosing the film.'],
+    ['call',     '2027-01-23', 'Catch-up with Jo',           '15:00', 'todo', 'Tell Jo all about Tokyo.'],
+    ['movie',    '2027-02-13', "Valentine's film",           '19:00', 'todo'],
+    ['shopping', '2027-02-20', 'New ski jacket',             '11:00', 'todo'],
+    ['call',     '2027-02-25', 'Call Sam',                   '18:30', 'todo'],
+    ['movie',    '2027-03-06', 'Cinema: spring premiere',    '19:45', 'todo'],
+  ].forEach(e => add(...e));
+  add('movie', null, "Watch the director's cut", '', 'todo');
+  add('shopping', null, 'Buy new trainers', '', 'todo');
+  add('call', null, 'Video call with cousins', '', 'todo');
+
+  return {
+    version: 2,
+    settings: { pretendToday: TODAY, viewMonth: '2027-01', showDoneOnly: false, locked: true },
+    types: [
+      { id: 'movie',     name: 'Movie',            icon: 'camera',       color: 'purple', goalPerMonth: 2,    cycleDays: null },
+      { id: 'holiday',   name: 'Overseas holiday', icon: 'planeTakeoff', endIcon: 'planeLanding', multiDay: true, color: 'sky', goalPerMonth: null, cycleDays: null },
+      { id: 'gym',       name: 'Gym',              icon: 'dumbbell',     color: 'orange', goalPerMonth: 12,   cycleDays: null },
+      { id: 'shopping',  name: 'Shopping',         icon: 'bag',          color: 'pink',   goalPerMonth: null, cycleDays: null },
+      { id: 'call',      name: 'Call friend',      icon: 'phone',        color: 'green',  goalPerMonth: null, cycleDays: 7 },
+      { id: 'bedsheets', name: 'Wash bedsheets',   icon: 'bed',          color: 'teal',   goalPerMonth: null, cycleDays: 14 },
+    ],
+    events,
+  };
+})();

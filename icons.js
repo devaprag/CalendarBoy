@@ -188,4 +188,16 @@ const ICONS = {
       <rect x="10" y="9" width="44" height="7" rx="3" fill="#cbd5e1" ${OUTLINE}/>
       <path d="M26 9 V5 H38 V9" fill="none" ${OUTLINE}/>
     </g>`),
+
+  lock: svg(`
+    <path d="M20 29 V20 Q20 8 32 8 Q44 8 44 20 V29" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>
+    <rect x="12" y="28" width="40" height="30" rx="6" fill="#facc15" ${OUTLINE}/>
+    <circle cx="32" cy="40" r="4" fill="#2b2b2b"/>
+    <path d="M32 42 V49" stroke="#2b2b2b" stroke-width="3.5" stroke-linecap="round"/>`),
+
+  unlock: svg(`
+    <path d="M44 29 V20 Q44 6 32 6 Q22 6 20 15" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>
+    <rect x="12" y="28" width="40" height="30" rx="6" fill="#86efac" ${OUTLINE}/>
+    <circle cx="32" cy="40" r="4" fill="#2b2b2b"/>
+    <path d="M32 42 V49" stroke="#2b2b2b" stroke-width="3.5" stroke-linecap="round"/>`),
 };

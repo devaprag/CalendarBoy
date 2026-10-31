@@ -1,22 +1,33 @@
 // ---------- Constants ----------
-const STORE_KEY = 'calendarBoy.v1';
-const YEAR = 2027, MONTH = 0; // January
-const MONTH_FIRST = '2027-01-01', MONTH_LAST = '2027-01-31';
+const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
+const STATE_VERSION = 2;
 const MAX_VISIBLE = 3;
 const DEFAULT_TRIP_DAYS = 3;
+const LONG_PRESS_MS = 500;
+const DRAG_THRESHOLD = 6;
+const STATUSES = ['todo', 'done', 'abandoned']; // a click cycles in this order
+const STATUS_LABEL = { todo: 'To do', done: 'Done', abandoned: 'Abandoned' };
 
 // ---------- State and storage ----------
 let state = loadState();
 
 function loadState() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORE_KEY));
+    const saved = migrate(JSON.parse(localStorage.getItem(STORE_KEY)));
     if (isValidState(saved)) return saved;
   } catch (err) { /* storage blocked or corrupt: fall back to the demo data */ }
   return structuredClone(SEED);
 }
+function migrate(s) {
+  if (s && s.version === 1) {
+    s.events.forEach(e => { e.status = e.done ? 'done' : 'todo'; delete e.done; });
+    Object.assign(s.settings, { locked: true, viewMonth: s.settings.pretendToday.slice(0, 7) });
+    s.version = 2;
+  }
+  return s;
+}
 function isValidState(s) {
-  return !!s && s.version === 1 && !!s.settings && Array.isArray(s.types) && Array.isArray(s.events);
+  return !!s && s.version === STATE_VERSION && !!s.settings && Array.isArray(s.types) && Array.isArray(s.events);
 }
 function saveState() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (err) { /* ignore */ }
@@ -29,16 +40,15 @@ function key(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
 function shiftKey(k, n) { return key(addDays(parseDate(k), n)); }
 function dayDiff(a, b) { return Math.round((parseDate(b) - parseDate(a)) / 86400000); }
-function inMonth(k) { return !!k && k >= MONTH_FIRST && k <= MONTH_LAST; }
+function shiftMonth(ym, n) { const [y, m] = ym.split('-').map(Number); return key(new Date(y, m - 1 + n, 1)).slice(0, 7); }
+function monthTitle(ym) { return parseDate(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); }
 function fmtDate(k) { return parseDate(k).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); }
 function fmtShort(k) { return parseDate(k).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
-const firstOfMonth = new Date(YEAR, MONTH, 1);
-const gridStart = addDays(firstOfMonth, -firstOfMonth.getDay());
-
 // ---------- Queries ----------
 const today = () => state.settings.pretendToday;
+const viewMonth = () => state.settings.viewMonth;
 const typeOf = e => state.types.find(t => t.id === e.typeId);
 const typeById = id => state.types.find(t => t.id === id);
 const byId = id => state.events.find(e => e.id === id);
@@ -46,9 +56,7 @@ const live = () => state.events.filter(e => !e.deletedAt);
 const scheduled = () => live().filter(e => e.start);
 const isTrip = e => !!typeOf(e)?.multiDay;
 const isPast = e => !!e.start && e.start <= today(); // today counts as the past
-const isMissed = e => isPast(e) && !e.done;
-const isHidden = e => state.settings.showDoneOnly && isMissed(e);
-const stateClass = e => [e.done && 'done', isMissed(e) && 'missed'].filter(Boolean).join(' ');
+const isHidden = e => state.settings.showDoneOnly && isPast(e) && e.status !== 'done';
 const newId = prefix => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 function eventsOn(k) {
@@ -57,21 +65,22 @@ function eventsOn(k) {
     .sort((a, b) => (a.time || '~').localeCompare(b.time || '~'));
 }
 
+// Goal and planned counts are for the month on screen; last done / next due look at everything.
 function typeStats(t) {
-  const evs = scheduled().filter(e => e.typeId === t.id);
-  const lastDone = evs.filter(e => e.done && e.start <= today()).map(e => e.start).sort().pop() || null;
-  const nextDue = t.cycleDays && lastDone ? shiftKey(lastDone, t.cycleDays) : null;
+  const all = scheduled().filter(e => e.typeId === t.id);
+  const month = all.filter(e => e.start.startsWith(viewMonth()));
+  const lastDone = all.filter(e => e.status === 'done' && e.start <= today()).map(e => e.start).sort().pop() || null;
   return {
-    done: evs.filter(e => e.done).length,
-    planned: evs.filter(e => !e.done && !isPast(e)).length,
+    done: month.filter(e => e.status === 'done').length,
+    planned: month.filter(e => e.status === 'todo' && !isPast(e)).length,
     lastDone,
-    nextDue,
+    nextDue: t.cycleDays && lastDone ? shiftKey(lastDone, t.cycleDays) : null,
   };
 }
 
 // ---------- Elements ----------
 const $ = id => document.getElementById(id);
-const weeksEl = $('weeks'), typesEl = $('types'), backlogEl = $('backlog');
+const weeksEl = $('weeks'), typesEl = $('types'), backlogEl = $('backlog'), paletteEl = $('palette');
 const popover = $('popover'), popBody = $('pop-body');
 const typeDialog = $('type-dialog'), typeForm = $('type-form');
 const todayInput = $('today-input'), importInput = $('import-file');
@@ -81,28 +90,46 @@ function colorVars(type) {
   const c = COLORS[type.color] || COLORS.sky;
   return `--c:${c.c};--tint:${c.tint}`;
 }
-function chip(type, iconKey) {
-  return `<span class="chip" style="${colorVars(type)}">${ICONS[iconKey || type.icon] || ICONS.camera}</span>`;
+function chip(type, iconKey, cls = '') {
+  return `<span class="chip${cls ? ' ' + cls : ''}" style="${colorVars(type)}">${ICONS[iconKey || type.icon] || ICONS.camera}</span>`;
 }
 function renderEvent(e) {
-  return `<button class="event ${stateClass(e)}" data-id="${e.id}" data-drag="event" title="${esc(e.title)}">
+  return `<button class="event ${e.status}" data-id="${e.id}" data-drag="event" title="${esc(e.title)}">
     ${chip(typeOf(e))}<span class="label">${esc(e.title)}${e.time ? `<small>${esc(e.time)}</small>` : ''}</span>
   </button>`;
 }
 
 function render() {
+  const locked = state.settings.locked;
+  document.body.classList.toggle('locked', locked);
   todayInput.value = today();
+  $('month-title').textContent = monthTitle(viewMonth());
   $('filter-btn').setAttribute('aria-pressed', state.settings.showDoneOnly);
+  const lockBtn = $('lock-btn');
+  lockBtn.setAttribute('aria-pressed', locked);
+  lockBtn.title = locked ? 'Icons are locked so scrolling never moves them. Tap to unlock.' : 'Icons can be dragged. Tap to lock.';
+  lockBtn.innerHTML = `${locked ? ICONS.lock : ICONS.unlock}<span>${locked ? 'Locked' : 'Unlocked'}</span>`;
+  renderPalette();
   renderTypes();
   renderBacklog();
   renderWeeks();
   renderBin();
 }
 
+function renderPalette() {
+  const how = state.settings.locked ? 'unlock, then drag onto a day' : 'drag onto a day or the backlog';
+  paletteEl.innerHTML = state.types.map(t =>
+    `<span class="type-chip" data-drag="type" data-type-id="${t.id}" title="${esc(t.name)}: ${how}">${chip(t)}</span>`).join('');
+}
+
 function renderWeeks() {
+  const [y, m] = viewMonth().split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const gridStart = addDays(first, -first.getDay());
+  const weekCount = Math.ceil((first.getDay() + new Date(y, m, 0).getDate()) / 7);
   const trips = scheduled().filter(e => e.end && !isHidden(e)).sort((a, b) => a.start.localeCompare(b.start));
   let html = '';
-  for (let w = 0; w < 6; w++) {
+  for (let w = 0; w < weekCount; w++) {
     const weekStart = addDays(gridStart, w * 7);
     const ws = key(weekStart), we = key(addDays(weekStart, 6));
 
@@ -122,7 +149,7 @@ function renderWeeks() {
       const evs = eventsOn(k);
       const shown = evs.length > MAX_VISIBLE ? evs.slice(0, MAX_VISIBLE - 1) : evs;
       const hidden = evs.length - shown.length;
-      cells += `<div class="day${inMonth(k) ? '' : ' other'}"${inMonth(k) ? ` data-drop="day" data-date="${k}"` : ''}>
+      cells += `<div class="day${k.startsWith(viewMonth()) ? '' : ' other'}" data-drop="day" data-date="${k}">
         <div class="date${k === today() ? ' today' : ''}">${d.getDate()}</div>
         <div class="lane"></div>
         <div class="events">
@@ -137,16 +164,17 @@ function renderWeeks() {
 }
 
 // One strip per week row: takeoff at the start day, dashed path, landing at the end day.
+// The takeoff and landing chips can be dragged on their own to change just that end.
 function renderTripSegment(t, ws, from, to, lane) {
   const type = typeOf(t);
   const col = dayDiff(ws, from), span = dayDiff(from, to) + 1;
   const startsHere = from === t.start, endsHere = to === t.end;
   const pathClass = ['path', !endsHere && 'to-edge', !startsHere && 'from-edge'].filter(Boolean).join(' ');
-  return `<button class="trip ${stateClass(t)}" data-id="${t.id}" data-drag="event" title="${esc(t.title)}"
+  return `<button class="trip ${t.status}" data-id="${t.id}" data-drag="event" title="${esc(t.title)}"
       style="${colorVars(type)};--lane:${lane};left:calc(${col} * 100% / 7 + 4px);width:calc(${span} * 100% / 7 - ${endsHere ? 8 : 4}px)">
-    ${startsHere ? chip(type, type.icon) : ''}
+    ${startsHere ? chip(type, type.icon, 'trip-start') : ''}
     <span class="${pathClass}">${span >= 2 ? `<span>${esc(t.title)}${startsHere ? '' : ' (cont.)'}</span>` : ''}</span>
-    ${endsHere ? chip(type, type.endIcon || type.icon) : '<span class="arrow">&#8250;</span>'}
+    ${endsHere ? chip(type, type.endIcon || type.icon, 'trip-end') : '<span class="arrow">&#8250;</span>'}
   </button>`;
 }
 
@@ -157,9 +185,9 @@ function cycleLabel(n) {
 }
 
 function renderTypes() {
+  $('types-month').textContent = `Counts for ${monthTitle(viewMonth())}`;
   typesEl.innerHTML = state.types.map(t => {
     const s = typeStats(t);
-    const counts = `${s.done}${t.goalPerMonth ? ` / ${t.goalPerMonth}` : ''} done · ${s.planned} planned`;
     const pct = t.goalPerMonth ? Math.min(100, Math.round(s.done / t.goalPerMonth * 100)) : 0;
     let cycle = '';
     if (t.cycleDays) {
@@ -173,12 +201,12 @@ function renderTypes() {
       cycle = `<div class="stat${overdue ? ' overdue' : ''}">${cycleLabel(t.cycleDays)} · ${due}</div>`;
     }
     return `<li class="type-row" style="${colorVars(t)}">
-      <span class="type-chip" data-drag="type" data-type-id="${t.id}" title="Drag onto a day">${chip(t)}</span>
+      ${chip(t)}
       <div class="type-info">
         <div class="type-name"><span>${esc(t.name)}</span>
           <button class="icon-btn" data-action="edit-type" data-type-id="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">&#9998;</button></div>
         ${t.goalPerMonth ? `<div class="progress"><span style="width:${pct}%"></span></div>` : ''}
-        <div class="stat">${counts}</div>
+        <div class="stat">${s.done}${t.goalPerMonth ? ` / ${t.goalPerMonth}` : ''} done · ${s.planned} planned</div>
         <div class="stat">Last done ${s.lastDone ? fmtShort(s.lastDone) : '—'}</div>
         ${cycle}
       </div>
@@ -190,7 +218,7 @@ function renderBacklog() {
   const items = live().filter(e => !e.start);
   backlogEl.innerHTML = items.length
     ? items.map(renderEvent).join('')
-    : '<p class="empty">Drag events here for “someday”.</p>';
+    : '<p class="empty">Drop events here for “someday”.</p>';
 }
 
 function renderBin() {
@@ -201,33 +229,29 @@ function renderBin() {
 }
 
 // ---------- Event changes ----------
-// Updates classes in place instead of re-rendering, so the second click of a double-click
-// still lands on the same element (two clicks toggle twice, then dblclick opens the popup).
-function toggleDone(id) {
+// Status changes update classes in place rather than re-rendering, so an icon you're cycling
+// stays put even if the Show done filter would now hide it.
+function setStatus(id, status) {
   const e = byId(id);
   if (!e) return;
-  e.done = !e.done;
+  e.status = status;
   saveState();
-  document.querySelectorAll(`.event[data-id="${id}"], .trip[data-id="${id}"]`).forEach(el => {
-    el.classList.toggle('done', e.done);
-    el.classList.toggle('missed', isMissed(e));
-  });
+  document.querySelectorAll(`.event[data-id="${id}"], .trip[data-id="${id}"]`).forEach(el =>
+    STATUSES.forEach(s => el.classList.toggle(s, s === status)));
   renderTypes();
 }
+function cycleStatus(id) {
+  const e = byId(id);
+  if (e) setStatus(id, STATUSES[(STATUSES.indexOf(e.status) + 1) % STATUSES.length]);
+}
 
-// Moves an event so it starts on `start`, keeping a trip's length. Returns false if it won't fit in January.
+// Moves an event so it starts on `start`; a trip keeps its length.
 function moveTo(e, start) {
   if (isTrip(e)) {
     const len = e.start && e.end ? dayDiff(e.start, e.end) + 1 : (e.days || DEFAULT_TRIP_DAYS);
-    const end = shiftKey(start, len - 1);
-    if (!inMonth(start) || !inMonth(end)) return false;
-    e.start = start;
-    e.end = end;
-  } else {
-    if (!inMonth(start)) return false;
-    e.start = start;
+    e.end = shiftKey(start, len - 1);
   }
-  return true;
+  e.start = start;
 }
 
 function unschedule(e) {
@@ -236,19 +260,29 @@ function unschedule(e) {
   e.end = null;
 }
 
-function addEvent(type, start) {
-  const e = { id: newId('e'), typeId: type.id, title: type.name, start: null, end: null, time: '', notes: '', done: false, deletedAt: null };
-  if (start && !moveTo(e, start)) { e.start = start; e.end = MONTH_LAST; }
+// The backlog's order is the order of its events in state.events.
+function placeInBacklog(e, beforeId) {
+  unschedule(e);
+  state.events.splice(state.events.indexOf(e), 1);
+  const i = beforeId ? state.events.findIndex(x => x.id === beforeId) : -1;
+  if (i === -1) state.events.push(e);
+  else state.events.splice(i, 0, e);
+}
+
+function addEvent(type, start, beforeId) {
+  const e = { id: newId('e'), typeId: type.id, title: type.name, start: null, end: null, time: '', notes: '', status: 'todo', deletedAt: null };
   state.events.push(e);
+  if (start) moveTo(e, start);
+  else placeInBacklog(e, beforeId);
   commit();
 }
 
 function duplicateEvent(id) {
   const e = byId(id);
-  const copy = { ...e, id: newId('e'), done: false, deletedAt: null };
+  const copy = { ...e, id: newId('e'), status: 'todo', deletedAt: null };
   if (e.start) {
-    const start = shiftKey(e.start, 1), end = e.end ? shiftKey(e.end, 1) : null;
-    if ((end || start) <= MONTH_LAST) { copy.start = start; copy.end = end; }
+    copy.start = shiftKey(e.start, 1);
+    copy.end = e.end ? shiftKey(e.end, 1) : null;
   }
   state.events.push(copy);
   closePopover();
@@ -292,23 +326,27 @@ function refreshPopover() {
 
 function closePopover() { popover.hidden = true; popoverView = null; }
 
+// Long-press / right-click: show an event's details (inside a "+N more" list, swap in place).
+function openInfo(item) {
+  const view = { kind: 'event', id: item.dataset.id };
+  if (popover.contains(item)) { popoverView = view; refreshPopover(); }
+  else showPopover(view, item);
+}
+
 function eventDetail(e) {
   const type = typeOf(e);
-  const status = !e.start ? 'In backlog' : e.done ? 'Done' : isPast(e) ? 'Not done' : 'Planned';
-  const range = `min="${MONTH_FIRST}" max="${MONTH_LAST}"`;
+  const when = !e.start ? 'In the backlog' : isPast(e) ? 'In the past' : 'Coming up';
   const dates = type.multiDay
     ? `<div class="field-row">
-        <label class="field">Start<input type="date" data-field="start" ${range} value="${e.start || ''}"></label>
-        <label class="field">End<input type="date" data-field="end" ${range} value="${e.end || ''}"></label>
+        <label class="field">Start<input type="date" data-field="start" value="${e.start || ''}"></label>
+        <label class="field">End<input type="date" data-field="end" value="${e.end || ''}"></label>
       </div>`
-    : `<label class="field">Date <small>(empty = backlog)</small><input type="date" data-field="start" ${range} value="${e.start || ''}"></label>`;
-  return `<div class="pop-head ${stateClass(e)}">${chip(type)}<div>
+    : `<label class="field">Date <small>(empty = backlog)</small><input type="date" data-field="start" value="${e.start || ''}"></label>`;
+  return `<div class="pop-head ${e.status}">${chip(type)}<div>
       <input class="pop-title" data-field="title" value="${esc(e.title)}" aria-label="Title">
-      <div class="pop-type">${esc(type.name)}</div></div></div>
-    <div class="pop-status">
-      <button class="btn ${e.done ? 'on' : ''}" data-action="toggle-done">${e.done ? '&#10003; Done' : 'Mark as done'}</button>
-      <span>${status}</span>
-    </div>
+      <div class="pop-type">${esc(type.name)} · ${when}</div></div></div>
+    <div class="pop-status seg" role="group" aria-label="Status">${STATUSES.map(s =>
+      `<button class="seg-btn${e.status === s ? ' on' : ''}" data-action="set-status" data-status="${s}">${STATUS_LABEL[s]}</button>`).join('')}</div>
     ${dates}
     <label class="field">Time<input data-field="time" value="${esc(e.time)}" placeholder="e.g. 07:00"></label>
     <label class="field">Notes<textarea data-field="notes" rows="2">${esc(e.notes)}</textarea></label>
@@ -321,7 +359,7 @@ function eventDetail(e) {
 function dayList(k) {
   const evs = eventsOn(k);
   return `<p class="pop-heading">${fmtDate(k)}</p>${evs.map(renderEvent).join('') || '<p class="empty">Nothing here.</p>'}
-    <p class="hint">Click to mark done · double-click for details</p>`;
+    <p class="hint">Tap to change status · long-press for details</p>`;
 }
 
 function binList() {
@@ -342,12 +380,15 @@ popover.addEventListener('change', ev => {
   if (field === 'title') e.title = value.trim() || typeOf(e).name;
   else if (field === 'time' || field === 'notes') e[field] = value.trim();
   else if (field === 'start') {
+    // A trip's start moves on its own, like dragging the takeoff icon.
     if (!value) unschedule(e);
-    else if (!moveTo(e, value)) alert("That doesn't fit inside January 2027.");
+    else if (!isTrip(e) || !e.start) moveTo(e, value);
+    else if (value <= e.end) e.start = value;
+    else alert('The start must be on or before the end date.');
     refreshPopover();
   } else if (field === 'end') {
-    if (e.start && inMonth(value) && value >= e.start) e.end = value;
-    else alert('The end date must be on or after the start date, within January.');
+    if (e.start && value && value >= e.start) e.end = value;
+    else alert('The end date must be on or after the start date.');
     refreshPopover();
   }
   commit();
@@ -434,7 +475,7 @@ importInput.addEventListener('change', () => {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      const data = JSON.parse(reader.result);
+      const data = migrate(JSON.parse(reader.result));
       if (!isValidState(data)) throw new Error('bad shape');
       state = data;
       closePopover();
@@ -454,12 +495,19 @@ function resetData() {
   commit();
 }
 
+function setToday(k) {
+  state.settings.pretendToday = k;
+  state.settings.viewMonth = k.slice(0, 7);
+  closePopover();
+  commit();
+}
+
 // ---------- Clicks ----------
 const ACTIONS = {
   more: el => showPopover({ kind: 'day', day: el.dataset.day }, el),
   'open-bin': el => showPopover({ kind: 'bin' }, el),
   'close-popover': closePopover,
-  'toggle-done': () => { toggleDone(popoverView.id); refreshPopover(); },
+  'set-status': el => { setStatus(popoverView.id, el.dataset.status); refreshPopover(); },
   duplicate: () => duplicateEvent(popoverView.id),
   remove: () => removeEvent(popoverView.id),
   restore: el => { byId(el.dataset.id).deletedAt = null; commit(); refreshPopover(); },
@@ -469,6 +517,11 @@ const ACTIONS = {
     commit();
     refreshPopover();
   },
+  'prev-month': () => { state.settings.viewMonth = shiftMonth(viewMonth(), -1); commit(); },
+  'next-month': () => { state.settings.viewMonth = shiftMonth(viewMonth(), 1); commit(); },
+  'go-today': () => { state.settings.viewMonth = today().slice(0, 7); commit(); },
+  'real-today': () => setToday(key(new Date())),
+  'toggle-lock': () => { state.settings.locked = !state.settings.locked; commit(); },
   'toggle-filter': () => { state.settings.showDoneOnly = !state.settings.showDoneOnly; commit(); },
   'add-type': () => openTypeEditor(null),
   'edit-type': el => openTypeEditor(el.dataset.typeId),
@@ -480,6 +533,7 @@ const ACTIONS = {
   reset: resetData,
 };
 
+// Set after a long-press or a drop, so the click the browser fires afterwards is ignored.
 let suppressClick = false;
 
 document.addEventListener('click', ev => {
@@ -494,24 +548,26 @@ document.addEventListener('click', ev => {
   const item = ev.target.closest('.event, .trip');
   if (item) {
     if (!popover.contains(item)) closePopover();
-    toggleDone(item.dataset.id);
+    cycleStatus(item.dataset.id);
     return;
   }
   if (!popover.contains(ev.target)) closePopover();
 });
 
-document.addEventListener('dblclick', ev => {
+// Right-click on desktop; on Android a long-press also arrives here.
+document.addEventListener('contextmenu', ev => {
   const item = ev.target.closest('.event, .trip');
   if (!item) return;
-  const view = { kind: 'event', id: item.dataset.id };
-  // Drilling in from a "+N more" list keeps the popover where it is.
-  if (popover.contains(item)) { popoverView = view; refreshPopover(); }
-  else showPopover(view, item);
+  ev.preventDefault();
+  if (press) { clearTimeout(press.timer); press = null; suppressClick = true; }
+  if (popoverView?.kind === 'event' && popoverView.id === item.dataset.id) return;
+  openInfo(item);
 });
 
 document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape') { cancelDrag(); closePopover(); }
+  if (ev.key === 'Escape') { endDrag(); press = null; closePopover(); }
 });
+
 // Only width changes: on phones the on-screen keyboard changes the height while editing popup fields.
 let lastWidth = window.innerWidth;
 window.addEventListener('resize', () => {
@@ -519,27 +575,31 @@ window.addEventListener('resize', () => {
   lastWidth = window.innerWidth;
 });
 
-todayInput.addEventListener('change', () => {
-  if (inMonth(todayInput.value)) state.settings.pretendToday = todayInput.value;
-  closePopover();
-  commit();
-});
+todayInput.addEventListener('change', () => { if (todayInput.value) setToday(todayInput.value); });
 
-// ---------- Drag and drop (Pointer Events, so it works with touch too) ----------
-let drag = null, ghost = null, hoverTarget = null;
+// ---------- Press: tap, long-press and drag (Pointer Events, so touch works too) ----------
+// A press that moves more than DRAG_THRESHOLD drags (only when unlocked; when locked the page
+// scrolls instead). A press held still for LONG_PRESS_MS opens the details.
+let press = null, ghost = null, hoverTarget = null, insertMarker = null;
 
 document.addEventListener('pointerdown', ev => {
   if (ev.button !== 0) return;
   const src = ev.target.closest('[data-drag]');
   if (!src) return;
-  drag = { src, x: ev.clientX, y: ev.clientY, active: false, offset: 0 };
-  if (src.classList.contains('trip')) drag.offset = grabOffset(src, ev.clientX);
+  press = { src, x: ev.clientX, y: ev.clientY, dragging: false, part: 'whole', offset: 0, timer: null };
+  if (src.matches('.event, .trip')) press.timer = setTimeout(longPress, LONG_PRESS_MS);
+  if (src.classList.contains('trip')) {
+    press.part = ev.target.closest('.trip-start') ? 'start' : ev.target.closest('.trip-end') ? 'end' : 'whole';
+    if (press.part === 'whole') press.offset = grabOffset(src, ev.clientX);
+  }
 });
 
 document.addEventListener('pointermove', ev => {
-  if (!drag) return;
-  if (!drag.active) {
-    if (Math.hypot(ev.clientX - drag.x, ev.clientY - drag.y) < 6) return;
+  if (!press) return;
+  if (!press.dragging) {
+    if (Math.hypot(ev.clientX - press.x, ev.clientY - press.y) < DRAG_THRESHOLD) return;
+    clearTimeout(press.timer);
+    if (state.settings.locked) { press = null; return; }
     startDrag();
   }
   ghost.style.left = ev.clientX + 'px';
@@ -550,21 +610,43 @@ document.addEventListener('pointermove', ev => {
     target?.classList.add('drop-hover');
     hoverTarget = target;
   }
+  const marker = target === backlogEl ? backlogInsertBefore(ev.clientX, ev.clientY, press.src) : null;
+  if (marker !== insertMarker) {
+    insertMarker?.classList.remove('insert-before');
+    marker?.classList.add('insert-before');
+    insertMarker = marker;
+  }
 });
 
 document.addEventListener('pointerup', ev => {
-  if (!drag) return;
-  if (drag.active) {
-    const d = drag, target = dropTargetAt(ev.clientX, ev.clientY);
-    cancelDrag();
-    // The click that follows a drag must not toggle done.
-    suppressClick = true;
-    setTimeout(() => { suppressClick = false; }, 0);
-    if (target) drop(d, target);
+  if (press) {
+    clearTimeout(press.timer);
+    if (press.dragging) {
+      const p = press, target = dropTargetAt(ev.clientX, ev.clientY);
+      endDrag();
+      suppressClick = true;
+      if (target) drop(p, target, ev.clientX, ev.clientY);
+    }
+    press = null;
   }
-  drag = null;
+  // The suppressed click (if any) fires right after pointerup; clear the flag once it has had its chance.
+  if (suppressClick) setTimeout(() => { suppressClick = false; }, 0);
 });
-document.addEventListener('pointercancel', cancelDrag);
+
+document.addEventListener('pointercancel', () => {
+  if (!press) return;
+  clearTimeout(press.timer);
+  endDrag();
+  press = null;
+});
+
+function longPress() {
+  if (!press || press.dragging) return;
+  const item = press.src;
+  press = null;
+  suppressClick = true;
+  openInfo(item);
+}
 
 // Which day of a trip strip was grabbed, so the trip keeps its position relative to the pointer.
 function grabOffset(src, x) {
@@ -574,46 +656,61 @@ function grabOffset(src, x) {
   return dayDiff(byId(src.dataset.id).start, shiftKey(row.dataset.weekStart, col));
 }
 
+function backlogInsertBefore(x, y, src) {
+  const items = [...backlogEl.querySelectorAll('.event')].filter(el => el !== src);
+  return items.find(el => {
+    const r = el.getBoundingClientRect();
+    return y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
+  }) || null;
+}
+
 function startDrag() {
-  drag.active = true;
+  press.dragging = true;
   closePopover();
-  const chipEl = drag.src.querySelector('.chip') || drag.src;
+  const { src, part } = press;
+  const chipEl = src.querySelector(part === 'start' ? '.trip-start' : part === 'end' ? '.trip-end' : '.chip');
   ghost = document.createElement('div');
   ghost.className = 'ghost';
-  ghost.innerHTML = chipEl.outerHTML;
+  ghost.innerHTML = chipEl ? chipEl.outerHTML : chip(typeOf(byId(src.dataset.id)));
   document.body.append(ghost);
-  drag.src.classList.add('drag-source');
+  src.classList.add('drag-source');
   document.body.classList.add('dragging');
 }
 
-function cancelDrag() {
-  if (!drag) return;
+function endDrag() {
   ghost?.remove();
   ghost = null;
   hoverTarget?.classList.remove('drop-hover');
   hoverTarget = null;
-  drag.src.classList.remove('drag-source');
+  insertMarker?.classList.remove('insert-before');
+  insertMarker = null;
+  press?.src.classList.remove('drag-source');
   document.body.classList.remove('dragging');
-  drag = null;
 }
 
 function dropTargetAt(x, y) {
   return document.elementFromPoint(x, y)?.closest('[data-drop]') || null;
 }
 
-function drop(d, target) {
+function drop(p, target, x, y) {
   const kind = target.dataset.drop;
-  if (d.src.dataset.drag === 'type') {
-    const type = typeById(d.src.dataset.typeId);
+  const beforeId = kind === 'backlog' ? backlogInsertBefore(x, y, p.src)?.dataset.id : null;
+  if (p.src.dataset.drag === 'type') {
+    const type = typeById(p.src.dataset.typeId);
     if (kind === 'day') addEvent(type, target.dataset.date);
-    else if (kind === 'backlog') addEvent(type, null);
+    else if (kind === 'backlog') addEvent(type, null, beforeId);
     return;
   }
-  const e = byId(d.src.dataset.id);
+  const e = byId(p.src.dataset.id);
   if (!e) return;
   if (kind === 'bin') e.deletedAt = new Date().toISOString();
-  else if (kind === 'backlog') unschedule(e);
-  else if (kind === 'day' && !moveTo(e, shiftKey(target.dataset.date, -d.offset))) return;
+  else if (kind === 'backlog') placeInBacklog(e, beforeId);
+  else if (kind === 'day') {
+    const k = target.dataset.date;
+    if (p.part === 'start' && e.end) { if (k > e.end) return; e.start = k; }
+    else if (p.part === 'end' && e.start) { if (k < e.start) return; e.end = k; }
+    else moveTo(e, shiftKey(k, -p.offset));
+  }
   commit();
 }
 

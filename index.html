@@ -6,21 +6,23 @@
 <title>Calendar Boy</title>
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="locked">
 
 <header>
   <div class="brand"><span id="brand-icon"></span><span>Calendar Boy</span></div>
-  <label class="today-pick" title="Pretend today, so January 2027 has a past and a future">Today
-    <input type="date" id="today-input" min="2027-01-01" max="2027-01-31">
-  </label>
-  <button class="nav-btn" disabled aria-label="Previous month" title="Prototype shows January 2027 only">&#8249;</button>
-  <button class="nav-btn" disabled aria-label="Next month" title="Prototype shows January 2027 only">&#8250;</button>
-  <h1>January 2027</h1>
+  <button class="btn" data-action="go-today" title="Jump to today's month">Today</button>
+  <button class="nav-btn" data-action="prev-month" aria-label="Previous month">&#8249;</button>
+  <button class="nav-btn" data-action="next-month" aria-label="Next month">&#8250;</button>
+  <h1 id="month-title"></h1>
   <span class="spacer"></span>
+  <label class="today-pick" title="Pretend today, so the demo months have a past and a future">Today is
+    <input type="date" id="today-input">
+  </label>
   <button class="toggle" id="filter-btn" data-action="toggle-filter" aria-pressed="false" title="Hide past events that weren't done">&#10003; Show done</button>
   <details class="menu">
     <summary>Data</summary>
     <div class="menu-list">
+      <button data-action="real-today">Use the real date as today</button>
       <button data-action="export">Export JSON</button>
       <button data-action="import">Import JSON&hellip;</button>
       <button data-action="reset">Reset demo data</button>
@@ -32,12 +34,22 @@
 <div class="app">
   <aside>
     <div class="side-head"><h2>Event types</h2><button class="btn small" data-action="add-type">+ Add</button></div>
-    <p class="hint">Drag an icon onto a day to add it. Click an event to mark it done, double-click for details.</p>
+    <p class="hint" id="types-month"></p>
     <ul class="types" id="types"></ul>
-    <div class="side-head"><h2>Backlog</h2></div>
-    <div class="backlog" id="backlog" data-drop="backlog"></div>
+    <p class="hint">Tap an icon to cycle To do &rarr; Done &rarr; Abandoned. Long-press (or right-click) for details.</p>
   </aside>
   <main>
+    <div class="shelf">
+      <button class="lock-btn" id="lock-btn" data-action="toggle-lock"></button>
+      <div class="shelf-group">
+        <span class="shelf-label">Add</span>
+        <div class="palette" id="palette"></div>
+      </div>
+      <div class="shelf-group backlog-group">
+        <span class="shelf-label">Backlog</span>
+        <div class="backlog" id="backlog" data-drop="backlog"></div>
+      </div>
+    </div>
     <div class="dow"><div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div></div>
     <div class="weeks" id="weeks"></div>
   </main>

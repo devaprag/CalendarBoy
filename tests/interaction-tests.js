@@ -1,109 +1,144 @@
 // Interaction tests. Loaded after app.js by tests/run-tests.sh, which prints the PASS/FAIL lines.
-// Fires synthetic pointer/click/dblclick events against the real page; state starts from SEED.
+// Fires synthetic pointer/click/contextmenu events against the real page; state starts from SEED.
 const out = [];
-const ok =(name, cond, extra = '') => out.push((cond ? 'PASS ' : 'FAIL ') + name + (extra ? '  [' + extra + ']' : ''));
+const ok = (name, cond, extra = '') => out.push((cond ? 'PASS ' : 'FAIL ') + name + (extra ? '  [' + extra + ']' : ''));
 window.alert = () => {}; window.confirm = () => true;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 const center = el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
 const pe = (type, el, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0, pointerId: 1, isPrimary: true }));
 const click = el => el.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
-const dbl = el => { click(el); click(el); el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); };
 const q = s => document.querySelector(s);
-const ev = id => q(`.event[data-id="${id}"]`);
+const find = (start, title) => state.events.find(e => e.start === start && e.title === title && !e.deletedAt);
+const elOf = e => q(`.event[data-id="${e.id}"], .trip[data-id="${e.id}"]`);
 const day = k => q(`.day[data-date="${k}"]`);
-function dragTo(src, target, from) {
-  const a = from || center(src), b = center(target);
+const backlogTitles = () => [...document.querySelectorAll('#backlog .event')].map(el => byId(el.dataset.id).title);
+function dragTo(src, target, from, to) {
+  const a = from || center(src), b = to || center(target);
   pe('pointerdown', src, a.x, a.y); pe('pointermove', src, a.x + 10, a.y + 10); pe('pointermove', src, b.x, b.y); pe('pointerup', src, b.x, b.y);
   click(document.body); // the click a real drag produces must be swallowed
 }
-try {
-  let el = ev('e7');
-  ok('e7 starts missed', el.classList.contains('missed'));
-  click(el);
-  ok('click marks done', byId('e7').done && el.classList.contains('done') && !el.classList.contains('missed'));
-  ok('saved to localStorage', JSON.parse(localStorage.getItem('calendarBoy.v1')).events.find(e => e.id === 'e7').done);
-  click(el);
-  ok('click again un-does', !byId('e7').done && el.classList.contains('missed'));
-  ok('gym stats', q('.type-row:nth-child(3)').textContent.includes('3 / 10 done'));
 
-  dbl(ev('e5'));
-  ok('dblclick leaves done unchanged', byId('e5').done === true);
-  ok('dblclick opens popup', !popover.hidden && q('.pop-title').value === 'Gym: legs');
+(async () => {
+  try {
+    ok('opens on January 2027', q('#month-title').textContent === 'January 2027' && q('.date.today').textContent === '18');
 
-  const n = state.events.length;
-  click(q('[data-action="duplicate"]'));
-  const dup = state.events[state.events.length - 1];
-  ok('duplicate on next day, not done', state.events.length === n + 1 && dup.start === '2027-01-05' && !dup.done && popover.hidden);
+    // Tap cycles To do -> Done -> Abandoned -> To do
+    const cinema = find('2027-01-22', 'Cinema with Alex');
+    let el = elOf(cinema);
+    ok('future to-do has ring class', el.classList.contains('todo'));
+    click(el); ok('tap -> done', cinema.status === 'done' && el.classList.contains('done'));
+    click(el); ok('tap -> abandoned', cinema.status === 'abandoned' && el.classList.contains('abandoned'));
+    click(el); ok('tap -> back to to do', cinema.status === 'todo' && el.classList.contains('todo'));
+    ok('saved to localStorage', JSON.parse(localStorage.getItem('calendarBoy.v1')).events.find(e => e.id === cinema.id).status === 'todo');
 
-  dbl(ev('e23'));
-  click(q('[data-action="remove"]'));
-  ok('remove sends to bin', !!byId('e23').deletedAt && !ev('e23') && q('#bin-badge').textContent === '1');
-  click(q('#bin'));
-  ok('bin popup lists item', !popover.hidden && popover.textContent.includes('Weekly groceries'));
-  click(q('[data-action="restore"]'));
-  ok('restore', !byId('e23').deletedAt && !!ev('e23') && q('#bin-badge').hidden);
-  click(document.body);
+    // Long-press opens info and the click after it doesn't change status
+    pe('pointerdown', el, center(el).x, center(el).y);
+    await sleep(LONG_PRESS_MS + 100);
+    pe('pointerup', el, center(el).x, center(el).y); click(el);
+    ok('long-press opens info', !popover.hidden && q('.pop-title').value === 'Cinema with Alex');
+    ok('long-press does not cycle', cinema.status === 'todo');
+    await sleep(10);
+    click(q('[data-action="set-status"][data-status="done"]'));
+    ok('popup status buttons', cinema.status === 'done' && q('.seg-btn.on').dataset.status === 'done');
+    click(document.body);
 
-  dbl(ev('e17'));
-  const t = q('.pop-title'); t.value = 'Cinema with Alex & Sam'; t.dispatchEvent(new Event('change', { bubbles: true }));
-  ok('edit title', byId('e17').title === 'Cinema with Alex & Sam');
-  const d = q('[data-field="start"]'); d.value = '2027-01-21'; d.dispatchEvent(new Event('change', { bubbles: true }));
-  ok('edit date moves event', byId('e17').start === '2027-01-21' && !!day('2027-01-21').querySelector('[data-id="e17"]'));
-  click(document.body);
+    // Right-click opens info
+    el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    ok('right-click opens info', !popover.hidden && q('.pop-title').value === 'Cinema with Alex');
 
-  dragTo(ev('e5'), day('2027-01-07'));
-  ok('drag moves event', byId('e5').start === '2027-01-07' && byId('e5').done === true, byId('e5').start);
+    // Duplicate, remove, bin, restore
+    const n = state.events.length;
+    click(q('[data-action="duplicate"]'));
+    const dup = state.events[state.events.length - 1];
+    ok('duplicate on next day, to do', state.events.length === n + 1 && dup.start === '2027-01-23' && dup.status === 'todo');
+    const jo = find('2027-01-23', 'Catch-up with Jo');
+    elOf(jo).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    click(q('[data-action="remove"]'));
+    ok('remove sends to bin', !!jo.deletedAt && !elOf(jo) && q('#bin-badge').textContent === '1');
+    click(q('#bin'));
+    click(q('[data-action="restore"]'));
+    ok('restore', !jo.deletedAt && !!elOf(jo) && q('#bin-badge').hidden);
+    click(document.body);
 
-  const trip = q('.trip[data-id="e15"]');
-  const cell15 = center(day('2027-01-15'));
-  dragTo(trip, day('2027-01-22'), { x: cell15.x, y: center(trip).y });
-  ok('drag trip keeps length + grab offset', byId('e15').start === '2027-01-21' && byId('e15').end === '2027-01-27', byId('e15').start + '..' + byId('e15').end);
-  dragTo(q('.trip[data-id="e15"]'), day('2027-01-30'));
-  ok('trip drop outside January rejected', byId('e15').start === '2027-01-21');
+    // Locked: dragging does nothing
+    ok('starts locked', state.settings.locked && document.body.classList.contains('locked'));
+    const gym = find('2027-01-25', 'Gym: legs') || state.events.find(e => e.typeId === 'gym' && e.start === '2027-01-25');
+    dragTo(elOf(gym), day('2027-01-26'));
+    ok('locked: drag ignored', gym.start === '2027-01-25');
+    click(q('#lock-btn'));
+    ok('unlock', !state.settings.locked && q('#lock-btn').textContent.includes('Unlocked'));
 
-  const before = state.events.length;
-  dragTo(q('.type-chip[data-type-id="gym"]'), day('2027-01-26'));
-  const created = state.events[state.events.length - 1];
-  ok('palette drag creates event', state.events.length === before + 1 && created.typeId === 'gym' && created.start === '2027-01-26');
-  dragTo(q('.type-chip[data-type-id="holiday"]'), day('2027-01-30'));
-  const trip2 = state.events[state.events.length - 1];
-  ok('new trip clamps at month end', trip2.start === '2027-01-30' && trip2.end === '2027-01-31');
+    dragTo(elOf(gym), day('2027-01-26'));
+    ok('drag moves event', gym.start === '2027-01-26', gym.start);
 
-  dragTo(ev('e18'), q('#backlog'));
-  ok('drag to backlog', byId('e18').start === null && !!q('#backlog [data-id="e18"]'));
-  dragTo(q('#backlog [data-id="e18"]'), day('2027-01-28'));
-  ok('backlog to day', byId('e18').start === '2027-01-28');
-  dragTo(q('.trip[data-id="e15"]'), q('#backlog'));
-  dragTo(q('#backlog [data-id="e15"]'), day('2027-01-03'));
-  ok('trip via backlog keeps length', byId('e15').start === '2027-01-03' && byId('e15').end === '2027-01-09', byId('e15').start + '..' + byId('e15').end);
+    // Trips: whole, start only, end only
+    const tokyo = find('2027-01-14', 'Trip to Tokyo');
+    const c15 = center(day('2027-01-15'));
+    dragTo(elOf(tokyo), day('2027-01-22'), { x: c15.x, y: center(elOf(tokyo)).y });
+    ok('drag trip middle moves whole trip', tokyo.start === '2027-01-21' && tokyo.end === '2027-01-27', tokyo.start + '..' + tokyo.end);
+    dragTo(q(`.trip[data-id="${tokyo.id}"] .trip-start`), day('2027-01-19'));
+    ok('drag takeoff moves start only', tokyo.start === '2027-01-19' && tokyo.end === '2027-01-27', tokyo.start + '..' + tokyo.end);
+    dragTo(q(`.trip[data-id="${tokyo.id}"] .trip-end`), day('2027-01-29'));
+    ok('drag landing moves end only', tokyo.start === '2027-01-19' && tokyo.end === '2027-01-29', tokyo.start + '..' + tokyo.end);
+    dragTo(q(`.trip[data-id="${tokyo.id}"] .trip-start`), day('2027-01-30'));
+    ok('start after end rejected', tokyo.start === '2027-01-19');
 
-  dragTo(ev('e24'), q('#bin'));
-  ok('drag to bin', !!byId('e24').deletedAt);
-  ok('drag did not toggle done', byId('e24').done === false && byId('e5').done === true);
+    // Palette and backlog ordering
+    ok('backlog seed order', backlogTitles().join('|') === "Watch the director's cut|Buy new trainers|Video call with cousins");
+    const firstBacklog = q('#backlog .event'), r1 = firstBacklog.getBoundingClientRect();
+    dragTo(q('.type-chip[data-type-id="gym"]'), backlogEl, null, { x: r1.left + 4, y: r1.top + r1.height / 2 });
+    ok('palette -> backlog inserts at drop position', backlogTitles()[0] === 'Gym' && backlogTitles().length === 4, backlogTitles().join('|'));
+    const last = [...document.querySelectorAll('#backlog .event')].pop();
+    const second = document.querySelectorAll('#backlog .event')[1], r2 = second.getBoundingClientRect();
+    dragTo(last, backlogEl, null, { x: r2.left + 4, y: r2.top + r2.height / 2 });
+    ok('reorder backlog', backlogTitles().join('|') === "Gym|Video call with cousins|Watch the director's cut|Buy new trainers", backlogTitles().join('|'));
+    const before = state.events.length;
+    dragTo(q('.type-chip[data-type-id="movie"]'), day('2027-01-28'));
+    ok('palette -> day creates to-do event', state.events.length === before + 1 && state.events[state.events.length - 1].start === '2027-01-28');
+    dragTo(q('#backlog .event'), day('2027-01-12'));
+    ok('backlog -> day', state.events.some(e => e.title === 'Gym' && e.start === '2027-01-12'));
+    dragTo(elOf(find('2027-01-23', 'Catch-up with Jo')), q('#bin'));
+    ok('drag to bin', !!jo.deletedAt);
 
-  click(q('#filter-btn'));
-  ok('filter hides past missed, keeps future', !ev('e7') && !ev('e11') && !!ev('e22') && !!ev('e6'));
-  click(q('#filter-btn'));
-  ok('filter off shows again', !!ev('e7'));
+    // Months
+    click(q('[data-action="next-month"]'));
+    ok('next month', q('#month-title').textContent === 'February 2027' && !!day('2027-02-13'));
+    click(q('[data-action="prev-month"]')); click(q('[data-action="prev-month"]'));
+    ok('prev month shows Lisbon trip', q('#month-title').textContent === 'December 2026' && !!q('.trip[title="Christmas in Lisbon"]'));
+    click(q('[data-action="go-today"]'));
+    ok('Today button', q('#month-title').textContent === 'January 2027');
 
-  todayInput.value = '2027-01-31'; todayInput.dispatchEvent(new Event('change'));
-  ok('moving today greys unfinished events', ev('e22').classList.contains('missed') && q('.date.today').textContent === '31');
-  todayInput.value = '2027-01-18'; todayInput.dispatchEvent(new Event('change'));
+    // Show done filter: hides past to-do and abandoned, keeps done and the future
+    click(q('[data-action="reset"]'));
+    const missedGym = state.events.find(e => e.typeId === 'gym' && e.start < '2027-01-18' && e.status === 'todo' && e.start >= '2027-01-01');
+    const abandoned = find('2027-01-13', 'Movie night at home');
+    const doneEv = find('2027-01-09', 'Call Mum');
+    click(q('#filter-btn'));
+    ok('filter hides past to-do + abandoned', !elOf(missedGym) && !q(`[data-id="${abandoned.id}"]`));
+    ok('filter keeps done + future', !!elOf(doneEv) && !!elOf(find('2027-01-22', 'Cinema with Alex')));
+    click(q('#filter-btn'));
 
-  click(q('[data-action="add-type"]'));
-  click(q('[data-action="preset"][data-preset="1"]'));
-  typeForm.requestSubmit();
-  const nt = state.types[state.types.length - 1];
-  ok('add type from preset', nt.name === 'Laundry' && nt.icon === 'washingMachine' && nt.cycleDays === 7 && !typeDialog.open);
-  click(q('[data-action="edit-type"][data-type-id="gym"]'));
-  typeForm.elements.name.value = 'Gym & weights'; typeForm.elements.goal.value = '12';
-  typeForm.requestSubmit();
-  ok('edit type', typeById('gym').name === 'Gym & weights' && typeById('gym').goalPerMonth === 12);
-  click(q('[data-action="edit-type"][data-type-id="shopping"]'));
-  click(q('[data-action="delete-type"]'));
-  ok('delete type removes its events', !typeById('shopping') && !state.events.some(e => e.typeId === 'shopping'));
+    // Sidebar stats
+    const rows = [...document.querySelectorAll('.type-row')].map(r => r.textContent.replace(/\s+/g, ' '));
+    ok('gym goal line', rows[2].includes('/ 12 done'), rows[2]);
+    ok('bedsheets overdue', rows[5].includes('overdue since 17 Jan'), rows[5]);
 
-  ok('state persisted', JSON.parse(localStorage.getItem('calendarBoy.v1')).types.length === state.types.length);
-  click(q('[data-action="reset"]'));
-  ok('reset restores seed', state.events.length === SEED.events.length && !!typeById('shopping'));
-} catch (err) { out.push('ERROR ' + err.stack); }
-document.body.innerHTML = '<pre id="out">' + out.join('\n') + '</pre>';
+    // Type editor
+    click(q('[data-action="add-type"]'));
+    click(q('[data-action="preset"][data-preset="1"]'));
+    typeForm.requestSubmit();
+    ok('add type from preset', state.types[state.types.length - 1].name === 'Laundry' && !!q('.type-chip[data-type-id="' + state.types[state.types.length - 1].id + '"]'));
+    click(q('[data-action="edit-type"][data-type-id="shopping"]'));
+    click(q('[data-action="delete-type"]'));
+    ok('delete type removes its events', !typeById('shopping') && !state.events.some(e => e.typeId === 'shopping'));
+
+    // Migration from the phase 2 (v1) format
+    const v1 = { version: 1, settings: { pretendToday: '2027-01-18', showDoneOnly: false }, types: [], events: [{ id: 'x', done: true }, { id: 'y', done: false }] };
+    const m = migrate(v1);
+    ok('migrates v1 data', isValidState(m) && m.events[0].status === 'done' && m.events[1].status === 'todo' && m.settings.viewMonth === '2027-01');
+
+    click(q('[data-action="reset"]'));
+    ok('reset restores seed', state.events.length === SEED.events.length && !!typeById('shopping'));
+  } catch (err) { out.push('ERROR ' + err.stack); }
+  document.body.innerHTML = '<pre id="out">' + out.join('\n') + '</pre>';
+})();

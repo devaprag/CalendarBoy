@@ -3,16 +3,16 @@
 Guidance for AI assistants (and humans) picking up this project.
 
 ## What this is
-**Calendar Boy**: a visual calendar that looks like a normal month-view app (modelled on Google Calendar), but every event is drawn as a **cartoon icon** instead of a text bar. It doubles as a **habit tracker**:
-- Future icons are plans.
-- Past icons show whether you actually did them.
+**Calendar Boy**: a visual calendar that looks like a normal month-view app (modelled on Google Calendar), but every event is drawn as a **cartoon icon** instead of a text bar. It doubles as a **habit tracker**: each event is *to do*, *done* or *abandoned*.
 
-The owner is building it for fun. Repo: https://github.com/devaprag/CalendarBoy (branch `main`).
+The owner is building it for fun and tests it on a Samsung phone as well as a PC. Repo: https://github.com/devaprag/CalendarBoy (branch `main`).
 
 **Status:**
 - Phase 1 (visual proof of concept): done.
-- Phase 2 (habit tracker): **built**, see [Phase 2 spec](#phase-2-spec-habit-tracker).
-- Still a proof of concept, still **January 2027 only**, still **no animation**.
+- Phase 2 (habit tracker): done.
+- **Phase 3 (changes after phone testing): built.** See [Behaviour spec](#behaviour-spec).
+- All months can be browsed. The demo "playground" data covers **Nov 2026 – Mar 2027**.
+- Still a proof of concept, still **no animation**.
 
 ## Tech
 - Plain HTML/CSS/vanilla JS, no build step, no dependencies. Open `index.html` straight in a browser (`file://` works). Don't add tooling unless the owner asks, because "just open the file" is part of the appeal.
@@ -29,117 +29,117 @@ The owner is building it for fun. Repo: https://github.com/devaprag/CalendarBoy 
   - `OUTLINE` / `THIN` stroke attributes give the cartoon outline.
   - `svg()` wraps a 64×64 body.
   - `ICONS` maps name → SVG string.
-  - `PLANE` is shared by `planeTakeoff` (rotated -24°) and `planeLanding` (+16°, with wheels).
-  - `bin` / `binFull` are UI-only icons.
+  - `PLANE` is shared by `planeTakeoff` / `planeLanding`.
+  - `bin`, `binFull`, `lock` and `unlock` are UI-only icons.
 - **`data.js`**
   - `COLORS` is the 8-colour palette, `{ c, tint }`.
-  - `ICON_LIBRARY` lists the icons offered in the type editor. `planeLanding` and the bins are excluded.
+  - `ICON_LIBRARY` lists the icons the type editor offers.
   - `PRESET_TYPES` holds the predefined types.
-  - `SEED` is the demo state, and `seedEvent()` is a helper for building it.
+  - `SEED` is **generated** by an IIFE:
+    - Gym Mon/Wed/Fri, groceries Saturday, Gran call Sunday, and bedsheets every 2 weeks, from Nov 2026 to Mar 2027. Routines are skipped while away on a trip.
+    - Three trips: Lisbon at Christmas, Tokyo in January, skiing in March.
+    - A list of one-off events and 3 backlog items.
+    - Past statuses come from a fixed pattern, so the demo is stable.
 - **`app.js`**, in section order:
-  1. State and storage: `loadState` / `saveState` / `commit()`. `commit()` means "save and fully re-render".
-  2. Date helpers. Dates are `YYYY-MM-DD` string keys, compared as strings. `parseDate` builds a *local* Date; never use `new Date('2027-01-14')`, which parses as UTC.
-  3. Queries: `isPast`, `isMissed`, `isHidden`, `typeStats`…
-  4. Render: `renderWeeks`, `renderTripSegment` (with trip lanes), `renderTypes`, `renderBacklog`, `renderBin`.
-  5. Event changes: `toggleDone`, `moveTo`, `unschedule`, `addEvent`, `duplicateEvent`, `removeEvent`.
-  6. Popover: one shared element with `popoverView` = `event` | `day` | `bin`. Field edits go through a delegated `change` listener.
-  7. Type editor: a native `<dialog>` rebuilt per open.
+  1. State and storage, including `migrate()` from older formats.
+  2. Date helpers, including month helpers.
+  3. Queries.
+  4. Render: the header bits, the shelf (lock, palette, backlog), the types sidebar, the month grid with trip lanes, and the bin.
+  5. Event changes.
+  6. Popover.
+  7. Type editor.
   8. Export / import / reset.
-  9. Clicks: a single delegated handler. `[data-action]` elements map to the `ACTIONS` table. Otherwise, a `.event` / `.trip` click toggles done, and `dblclick` opens the popup.
-  10. Drag and drop: Pointer Events.
+  9. Clicks (the `ACTIONS` table).
+  10. Press handling: tap, long-press, drag.
 
 ## Data model
-Stored in localStorage key `calendarBoy.v1`. Export uses the same JSON shape.
+Stored in localStorage key `calendarBoy.v1`. The key name is historical; the object carries `version`. Export uses the same JSON shape.
 ```js
 {
-  version: 1,
-  settings: { pretendToday: '2027-01-18', showDoneOnly: false },
+  version: 2,
+  settings: { pretendToday: '2027-01-18', viewMonth: '2027-01', showDoneOnly: false, locked: true },
   types: [{ id, name, icon, color, goalPerMonth|null, cycleDays|null, multiDay?, endIcon? }],
-  events: [{ id, typeId, title, start|null, end|null, time, notes, done, deletedAt|null, days? }]
+  events: [{ id, typeId, title, start|null, end|null, time, notes, status: 'todo'|'done'|'abandoned', deletedAt|null, days? }]
 }
 ```
-- `start: null` means the event is in the **backlog**.
+- `start: null` means the event is in the **backlog**. The backlog's **order is the order of `state.events`**, so `placeInBacklog()` splices to reorder.
 - `deletedAt` set means it is in the **bin**.
-- `end` is set only for multi-day (trip) events.
-- `days` remembers a trip's length while it sits in the backlog.
-- Past / missed are **derived** from pretend-today; never store them.
-- If the shape changes, bump `version`. `isValidState()` rejects other versions, and the app falls back to the seed.
+- `end` is set only for trips. `days` remembers a trip's length while it sits in the backlog.
+- Past/future is **derived** from `pretendToday` (today counts as past); never store it.
+- When the shape changes: bump `STATE_VERSION`, and add a step to `migrate()` so saved data on the owner's phone survives. `migrate()` already handles v1 (`done: bool`) → v2 (`status`). Import goes through `migrate()` too.
 
-## Phase 2 spec (habit tracker)
-Decisions made with the owner. These are built, so keep them unless the owner changes them.
+## Behaviour spec
+Decided with the owner. Keep these unless the owner changes them.
 
 | Topic | Decision |
 |---|---|
-| "Today" | A **pretend-today** date picker in the header (default 18 Jan 2027). **Today counts as the past**: "past" means on or before pretend-today. |
-| Storage | localStorage + **Export / Import JSON** + Reset demo data (the header "Data" menu). |
-| Single click on an icon | **Toggles done / not done**, for past *and* future events. |
-| Double-click on an icon | Opens the **details popup**. It does **not** duplicate. |
-| Popup actions | Done toggle, **Duplicate** (the copy lands on the following day, not done), **Remove** (to the bin), edit title / time / notes / date. Trips have start and end dates. An empty date sends a single-day event to the backlog. |
-| Adding events | **Drag an icon from the Event types sidebar** onto a day (or onto the backlog). |
-| Done / not-done icons | The **same icon**; only the styling differs (see below). |
-| Show done filter | Hides **past not-done** icons only. Future icons always stay visible. |
-| Goals | Per type, optional, shown as `6 / 10 done · 3 planned` + progress bar. |
-| Last done / cycle | Per type: last done date, `Every 2 weeks · next due 29 Jan` / `due today` / `overdue since …` (red). |
-| Deleting a type | Deletes **all its events permanently** (not to the bin), after a confirm showing the count. |
-| Trips | Count like any other event for done, goals and cycles. Dragging moves the whole trip and keeps its length. |
-| Tentative state | **Dropped for now.** It could come back later. |
-
-Visual states (CSS classes on `.event` / `.trip`):
-
-| | Not done | Done (`.done`) |
-|---|---|---|
-| **Past (incl. today)** | `.missed`: grey (grayscale + 45% opacity), no ring | Solid ring in the type colour |
-| **Future** | Normal, no ring | Solid ring |
+| Statuses | **To do → Done → Abandoned**. A **single tap/click cycles** through them in that order. New events start as To do. |
+| Looks (past *and* future alike) | To do = **coloured ring**. Done = **plain icon**. Abandoned = **greyed out**. |
+| Details popup | **Long-press** (500ms) on touch or mouse, or **right-click** on desktop. Double-click was dropped because two taps cycle the status twice. The popup has status buttons, title/time/notes/date fields, **Duplicate** (the copy lands on the next day as To do) and **Remove** (to the bin). |
+| Lock | The 🔒 button in the shelf. **Locked by default**, and remembered. When locked nothing can be dragged, so scrolling on a phone never moves icons. Tap and long-press still work. |
+| Shelf (top of the calendar) | Lock + **Add palette** (type icons to drag onto a day or the backlog) + **Backlog** (drop zone; drag items into a new **order**). |
+| Trips | Drag the **takeoff** icon to move **only the start**. Drag the **landing** icon to move **only the end** (start ≤ end is enforced). Drag the **dashed middle** to move the **whole trip**. The popup's start/end fields behave the same way. |
+| Months | All months: ‹ › arrows plus a **Today** button (jumps to pretend-today's month). Overflow days from neighbouring months show events and accept drops. |
+| "Today" | The **"Today is" date picker** sets a pretend today (default 18 Jan 2027, so the playground has a past). Data → "Use the real date as today". |
+| Show done filter | Hides **past** events that aren't done (to do or abandoned). Future events always show. |
+| Sidebar | Event types with **counts for the month on screen** (`5 / 12 done · 4 planned`, plus a progress bar when there's a goal), last done, and repeat cycle / next due / **overdue** (red). |
+| Deleting a type | Deletes all its events permanently, after a confirm showing the count. |
+| Other | The recycling bin (bottom right) restores items or empties. Data menu: Export / Import JSON, Reset demo data. |
 
 ## Conventions
 - **Icon style**: flat fills, thick dark outline (`OUTLINE`), 64×64 viewBox, readable at 26px. New icons go in `ICONS`, plus `ICON_LIBRARY` if users should be able to pick them.
 - **Colours**:
-  - A type's colour is a `COLORS` key. `colorVars(type)` sets `--c` (strong colour: ring, path, progress bar) and `--tint` (chip background) inline.
+  - A type's colour is a `COLORS` key. `colorVars(type)` sets `--c` (ring, path, progress bar) and `--tint` (chip background) inline.
   - Don't name a CSS variable `--bg`, because that's the page background token.
-  - Page-level tokens live on `:root` in `styles.css`.
+- **Status classes**: `.todo`, `.done` and `.abandoned` on `.event` / `.trip` (and on `.pop-head`). CSS styles the `.chip` inside.
 - **Markup**: rendered with template strings. User-visible text **must** go through `esc()`.
-- **Dates**: `en-GB` format (`Thu 14 Jan`). Weeks start on **Sunday**.
+- **Dates**: `YYYY-MM-DD` string keys, compared as strings. `parseDate` builds a *local* Date; never `new Date('2027-01-14')` (that's UTC). Display is `en-GB`. Weeks start on **Sunday**.
 - **Comments**: match the existing density (sparse; only where something isn't obvious). CSS sections are marked `/* ---------- Name ---------- */`, with one `@media (max-width: 800px)` block at the end.
 
 ## Gotchas (don't reintroduce)
-- **Click vs double-click**:
-  - `toggleDone` updates classes **in place** and re-renders only the sidebar types. A full re-render would replace the element between the two clicks, and `dblclick` would never fire.
-  - A double-click is two clicks, so the toggles cancel out and then the popup opens.
-- **Drag vs click**:
-  - A drag starts after the pointer moves 6px.
-  - After a drop, `suppressClick` swallows the click the browser fires. It is reset by `setTimeout(0)`, because the source element is usually re-rendered away and that click never reaches it.
+- **Status changes update classes in place** (`setStatus`) and re-render only the sidebar. The icon stays put while you cycle it, even if Show done would now hide it.
+- **Press handling** (`pointerdown` → `press`):
+  - Moving more than 6px starts a drag, or does nothing when locked, so the browser scrolls.
+  - Holding for 500ms opens the details.
+  - After a long-press or a drop, `suppressClick` swallows the browser's follow-up click. It is cleared with `setTimeout(0)` after `pointerup`, because the source element is often re-rendered away and that click never reaches it.
+- **Android long-press** also fires `contextmenu`. The handler calls `preventDefault()` and avoids opening the same popup twice. `-webkit-touch-callout: none` stops the system callout.
+- **Touch scrolling**: `touch-action: none` is applied to `[data-drag]` **only when unlocked** (`body:not(.locked)`). Otherwise phones couldn't scroll when a swipe starts on an icon.
 - **Trips during drag**:
-  - `.dragging .trip { pointer-events: none }`, so `elementFromPoint` finds the day cell under a trip strip.
-  - `grabOffset()` remembers which day of the trip was grabbed.
-- `[data-drag]` needs `touch-action: none`, or touch drags scroll the page.
-- **Popup and resize**: the popup closes on resize only if the **width** changes. The phone keyboard changes the height while you edit a field.
+  - `.dragging .trip { pointer-events: none }`, so `elementFromPoint` finds the day under a trip strip.
+  - `press.part` is `start`, `end` or `whole`.
+  - `grabOffset()` keeps the grabbed day under the pointer for whole-trip moves.
+- **Popup and resize**: the popup closes on resize only if the **width** changes. The phone keyboard changes the height while editing.
 - **Layout**:
   - `.week` must be `flex: 1 0 auto`.
-  - Grid columns must be `repeat(7, minmax(0, 1fr))`, or busy rows overflow and narrow screens scroll sideways.
+  - Grid columns must be `repeat(7, minmax(0, 1fr))`.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and dblclick events, and prints PASS/FAIL lines (31 tests at the time of writing).
-  - Each run uses a fresh browser profile, so state starts from `SEED`.
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (38 at the time of writing).
+  - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
+  - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.
 - **Screenshots**:
   ```bash
   E="/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
-  "$E" --headless=new --disable-gpu --window-size=1440,1250 --screenshot="<scratch>/desk.png" "file:///D:/coding%20for%20fun/calendar_boy/index.html"
+  "$E" --headless=new --disable-gpu --user-data-dir="<scratch>/profile" --window-size=1440,1150 --screenshot="<scratch>/desk.png" "file:///D:/coding%20for%20fun/calendar_boy/index.html"
   ```
-  - Headless Edge won't go below a ~492px viewport, and smaller `--window-size` captures are just cropped. For a true phone check, use a real browser's device toolbar.
-  - `--screenshot` resizes the window before capturing, which closes the popup. To photograph a popup, reopen it from a `resize` listener in a throwaway script.
-- **Not covered by the tests**: real touch input, and Export/Import (needs a real file dialog). Say so if you change those parts.
+  - Use a throwaway `--user-data-dir`, or you get stale localStorage.
+  - Headless Edge won't go below a ~492px viewport, and smaller captures are just cropped.
+  - `--screenshot` resizes the window, which closes popups. Reopen them from a `resize` listener in a throwaway script.
+- **Phone testing** (owner has a Samsung):
+  - Enable GitHub Pages (Settings → Pages → `main` / root), giving https://devaprag.github.io/CalendarBoy/
+  - Or run `npx serve -l 8000` and open `http://<PC IPv4>:8000` on the same Wi-Fi.
+- **Not covered by the tests**: real touch input (long-press timing, scrolling while locked), and Export/Import (needs a real file dialog). Say so if you change those parts.
 
 ## Environment and git
-- Windows 11. Both Git Bash and PowerShell are available. Git warns about LF→CRLF, which is harmless.
+- Windows 11. Both Git Bash and PowerShell are available. Node is installed. Git warns about LF→CRLF, which is harmless.
 - `gh` CLI is **not installed**. Pushing uses Git Credential Manager over HTTPS. If a push fails with an auth error, the owner has to sign in. Don't work around it.
 - Commit only when asked or as part of an agreed workflow. Never force-push.
 
-## Ideas for later phases (not agreed yet; ask the owner first)
+## Ideas for later (not agreed yet; ask the owner first)
 - Animation (e.g. the plane taking off on load, icons wobbling on hover). The owner explicitly deferred this.
-- Navigating months, and week/day views. A cycle's "next due" can already point past January.
-- The tentative state (dropped in phase 2).
+- Week/day views.
 - Icon refinement: the plane angles are subtle at small sizes.
 - More multi-day icon pairs (road trip, hospital stay). Custom types are single-day only for now, and `multiDay` / `endIcon` exist only on the seeded holiday type.
 - Real file storage (File System Access API, or a tiny local server) if localStorage + export isn't enough.
