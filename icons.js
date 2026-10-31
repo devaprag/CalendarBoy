@@ -172,6 +172,14 @@ const ICONS = {
     <ellipse cx="39" cy="16" rx="5.5" ry="7.5" fill="#b45309" ${OUTLINE}/>
     <ellipse cx="50" cy="27" rx="5.5" ry="7" fill="#b45309" ${OUTLINE}/>`),
 
+  laptop: svg(`
+    <rect x="11" y="12" width="42" height="30" rx="4" fill="#334155" ${OUTLINE}/>
+    <rect x="15" y="16" width="34" height="22" rx="1.5" fill="#1e293b"/>
+    <path d="M25 22 L20 27 L25 32 M39 22 L44 27 L39 32" fill="none" stroke="#4ade80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M34.5 20.5 L29.5 33.5" stroke="#facc15" stroke-width="3" stroke-linecap="round"/>
+    <path d="M4 46 H60 L56 53 Q55 55 52 55 H12 Q9 55 8 53 Z" fill="#cbd5e1" ${OUTLINE}/>
+    <path d="M27 46 V48 Q27 49 28 49 H36 Q37 49 37 48 V46" fill="#94a3b8" stroke="#2b2b2b" stroke-width="2" stroke-linejoin="round"/>`),
+
   // UI only, not offered as event icons
   bin: svg(`
     <path d="M14 20 H50 L46 58 H18 Z" fill="#94a3b8" ${OUTLINE}/>

@@ -19,7 +19,7 @@ Open `index.html` in a browser. There's nothing to install and no build step. Yo
   - Drag the dashed line to move the whole trip.
 - **‹ ›** browse months, or **swipe left/right** on a phone, or **scroll the mouse wheel** over the calendar on a computer. The demo data covers **Nov 2026 – Mar 2027**.
 - **Today is …** sets a pretend today, so the demo has a past and a future. **Today** jumps back to that month.
-- **Show done** hides past events that weren't done.
+- **Show done** shows only events that are done (past and future).
 - The sidebar shows, for each event type:
   - its **goal** for the month (e.g. `5 / 12 done · 4 planned`);
   - when it was **last done**;

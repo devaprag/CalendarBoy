@@ -145,15 +145,21 @@ function dragTo(src, target, from, to) {
     click(q('[data-action="go-today"]'));
     await sleep(SLIDE_MS + 100);
 
-    // Show done filter: hides past to-do and abandoned, keeps done and the future
+    // Show done filter: only done events show, past and future alike
     click(q('[data-action="reset"]'));
     const missedGym = state.events.find(e => e.typeId === 'gym' && e.start < '2027-01-18' && e.status === 'todo' && e.start >= '2027-01-01');
     const abandoned = find('2027-01-13', 'Movie night at home');
     const doneEv = find('2027-01-09', 'Call Mum');
+    const futureEv = find('2027-01-22', 'Cinema with Alex');
     click(q('#filter-btn'));
     ok('filter hides past to-do + abandoned', !elOf(missedGym) && !q(`[data-id="${abandoned.id}"]`));
-    ok('filter keeps done + future', !!elOf(doneEv) && !!elOf(find('2027-01-22', 'Cinema with Alex')));
+    ok('filter keeps past done', !!elOf(doneEv));
+    ok('filter hides future to-do', !elOf(futureEv));
+    futureEv.status = 'done'; render();
+    ok('filter keeps future done', !!elOf(futureEv));
+    futureEv.status = 'todo';
     click(q('#filter-btn'));
+    ok('filter off shows future to-do again', !!elOf(futureEv));
 
     // Sidebar stats
     const rows = [...document.querySelectorAll('.type-row')].map(r => r.textContent.replace(/\s+/g, ' '));

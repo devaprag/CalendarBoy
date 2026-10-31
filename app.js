@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.2';
+const APP_VERSION = '4.3';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 const MAX_VISIBLE = 3;
@@ -68,7 +68,8 @@ const live = () => state.events.filter(e => !e.deletedAt && typeOf(e));
 const scheduled = () => live().filter(e => e.start);
 const isTrip = e => !!typeOf(e)?.multiDay;
 const isPast = e => !!e.start && e.start <= today(); // today counts as the past
-const isHidden = e => state.settings.showDoneOnly && isPast(e) && e.status !== 'done';
+// Show done hides everything that isn't done, past and future alike.
+const isHidden = e => state.settings.showDoneOnly && e.status !== 'done';
 const newId = prefix => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 function eventsOn(k) {

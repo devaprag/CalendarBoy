@@ -17,6 +17,7 @@ const ICON_LIBRARY = [
   ['tooth', 'Tooth'], ['medkit', 'First-aid kit'], ['shoe', 'Running shoe'], ['swim', 'Swim ring'],
   ['book', 'Book'], ['stones', 'Zen stones'], ['spray', 'Spray bottle'], ['wateringCan', 'Watering can'],
   ['coins', 'Money'], ['cake', 'Cake'], ['dinner', 'Plate'], ['bike', 'Bike'], ['music', 'Music'], ['paw', 'Paw'],
+  ['laptop', 'Laptop (coding)'],
 ];
 
 const PRESET_TYPES = [
@@ -37,6 +38,7 @@ const PRESET_TYPES = [
   { name: 'Cycle',          icon: 'bike',           color: 'orange', goalPerMonth: 6,    cycleDays: null },
   { name: 'Music practice', icon: 'music',          color: 'purple', goalPerMonth: 12,   cycleDays: null },
   { name: 'Walk the dog',   icon: 'paw',            color: 'yellow', goalPerMonth: null, cycleDays: 1 },
+  { name: 'Coding',         icon: 'laptop',         color: 'purple', goalPerMonth: 10,   cycleDays: null },
 ];
 
 
