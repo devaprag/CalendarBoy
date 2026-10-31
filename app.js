@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '3.4';
+const APP_VERSION = '3.5';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 2;
 const MAX_VISIBLE = 3;
@@ -111,6 +111,9 @@ function render() {
   lockBtn.setAttribute('aria-pressed', locked);
   lockBtn.title = locked ? 'Icons are locked so scrolling never moves them. Tap to unlock.' : 'Icons can be dragged. Tap to lock.';
   lockBtn.innerHTML = `${locked ? ICONS.lock : ICONS.unlock}<span>${locked ? 'Locked' : 'Unlocked'}</span>`;
+  const collapsed = !!state.settings.statsCollapsed;
+  $('side').classList.toggle('collapsed', collapsed);
+  $('side-toggle').setAttribute('aria-expanded', !collapsed);
   renderPalette();
   renderTypes();
   renderBacklog();
@@ -524,6 +527,7 @@ const ACTIONS = {
   'go-today': () => goToMonth(today().slice(0, 7)),
   'real-today': () => setToday(key(new Date())),
   'toggle-lock': () => { state.settings.locked = !state.settings.locked; commit(); },
+  'toggle-stats': () => { state.settings.statsCollapsed = !state.settings.statsCollapsed; commit(); },
   'toggle-filter': () => { state.settings.showDoneOnly = !state.settings.showDoneOnly; commit(); },
   'add-type': () => openTypeEditor(null),
   'edit-type': el => openTypeEditor(el.dataset.typeId),

@@ -101,6 +101,12 @@ header h1 { margin: 0 0 0 4px; font-size: 22px; font-weight: 400; white-space: n
 aside { width: 270px; flex-shrink: 0; padding: 12px 16px 100px; }
 .side-head { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; }
 aside h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.side-toggle {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 0; border: 0; background: none; pointer-events: none; /* only a control on phones */
+}
+.side-toggle .chevron { display: none; color: var(--muted); }
+.shelf-add { display: none; }
 main {
   flex: 1; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line);
   touch-action: pan-y pinch-zoom; /* horizontal swipes change month instead of panning */
@@ -296,8 +302,14 @@ dialog h2 { margin: 0 0 12px; font-size: 18px; font-weight: 500; }
   .brand { margin-right: 0; }
   .brand span:last-child { display: none; }
   header h1 { font-size: 18px; }
-  .app { flex-direction: column; }
-  aside { width: auto; order: 2; border-top: 1px solid var(--line); }
+  .app { flex-direction: column; min-height: 0; } /* natural height, so a collapsed panel sits right under the calendar */
+  aside { width: auto; order: 2; border-top: 1px solid var(--line); padding-bottom: 90px; }
+  .side-toggle { pointer-events: auto; cursor: pointer; flex: 1; }
+  .side-toggle .chevron { display: inline; font-size: 14px; }
+  aside.collapsed .chevron { transform: rotate(-90deg); }
+  aside.collapsed #side-body { display: none; }
+  .add-label { display: none; }
+  .shelf-add { display: inline-block; flex-shrink: 0; }
   main { border-left: 0; }
   .shelf { padding: 6px 8px; gap: 6px 10px; }
   /* Floating in the bottom-left corner, mirroring the bin. */

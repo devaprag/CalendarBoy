@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Calendar Boy</title>
-<link rel="stylesheet" href="styles.css?v=3.4">
+<link rel="stylesheet" href="styles.css?v=3.5">
 </head>
 <body class="locked">
 
@@ -33,17 +33,26 @@
 </header>
 
 <div class="app">
-  <aside>
-    <div class="side-head"><h2>Event types</h2><button class="btn small" data-action="add-type">+ Add</button></div>
-    <p class="hint" id="types-month"></p>
-    <ul class="types" id="types"></ul>
-    <p class="hint">Tap an icon to cycle To do &rarr; Done &rarr; Abandoned. Long-press (or right-click) for details.</p>
+  <aside id="side">
+    <div class="side-head">
+      <!-- The heading collapses the panel on phones; on desktop it's just a heading. -->
+      <button class="side-toggle" id="side-toggle" data-action="toggle-stats" aria-controls="side-body">
+        <h2>Event types</h2><span class="chevron" aria-hidden="true">&#9662;</span>
+      </button>
+      <button class="btn small" data-action="add-type">+ Add</button>
+    </div>
+    <div id="side-body">
+      <p class="hint" id="types-month"></p>
+      <ul class="types" id="types"></ul>
+      <p class="hint">Tap an icon to cycle To do &rarr; Done &rarr; Abandoned. Long-press (or right-click) for details.</p>
+    </div>
   </aside>
   <main>
     <div class="shelf">
       <button class="lock-btn" id="lock-btn" data-action="toggle-lock"></button>
       <div class="shelf-group">
-        <span class="shelf-label">Add</span>
+        <span class="shelf-label add-label">Add</span>
+        <button class="btn small shelf-add" data-action="add-type" title="New event type">+ Add</button>
         <div class="palette" id="palette"></div>
       </div>
       <div class="shelf-group backlog-group">
@@ -68,8 +77,8 @@
 <dialog id="type-dialog"><form id="type-form"></form></dialog>
 
 <!-- Plain scripts, not modules: modules and fetch() are blocked on file:// -->
-<script src="icons.js?v=3.4"></script>
-<script src="data.js?v=3.4"></script>
-<script src="app.js?v=3.4"></script>
+<script src="icons.js?v=3.5"></script>
+<script src="data.js?v=3.5"></script>
+<script src="app.js?v=3.5"></script>
 </body>
 </html>

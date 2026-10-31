@@ -170,6 +170,15 @@ function dragTo(src, target, from, to) {
     ok('vertical-ish swipe ignored', q('#month-title').textContent === 'January 2027');
     await sleep(350);
 
+    // Habit panel collapses (only visible on phones, but the state works everywhere) and is remembered
+    click(q('#side-toggle'));
+    ok('collapse habit panel', state.settings.statsCollapsed && q('#side').classList.contains('collapsed') && q('#side-toggle').getAttribute('aria-expanded') === 'false');
+    click(q('#side-toggle'));
+    ok('expand habit panel', !state.settings.statsCollapsed && !q('#side').classList.contains('collapsed'));
+    click(q('.shelf-add'));
+    ok('shelf + Add opens new type dialog', typeDialog.open && q('#type-form h2').textContent === 'New event type');
+    click(q('[data-action="close-dialog"]'));
+
     // Migration from the phase 2 (v1) format
     const v1 = { version: 1, settings: { pretendToday: '2027-01-18', showDoneOnly: false }, types: [], events: [{ id: 'x', done: true }, { id: 'y', done: false }] };
     const m = migrate(v1);
