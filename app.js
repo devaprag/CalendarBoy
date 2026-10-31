@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '3.5';
+const APP_VERSION = '3.6';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 2;
 const MAX_VISIBLE = 3;
@@ -582,6 +582,18 @@ window.addEventListener('resize', () => {
 });
 
 todayInput.addEventListener('change', () => { if (todayInput.value) setToday(todayInput.value); });
+
+// The Data menu opens right-aligned under its button, nudged sideways if that would leave the screen
+// (on phones the header wraps and the button can end up at the left edge).
+const dataMenu = document.querySelector('.menu');
+dataMenu.addEventListener('toggle', () => {
+  if (!dataMenu.open) return;
+  const list = dataMenu.querySelector('.menu-list');
+  const m = dataMenu.getBoundingClientRect(), w = list.offsetWidth, margin = 8;
+  const left = Math.max(margin, Math.min(m.right - w, window.innerWidth - w - margin));
+  list.style.left = (left - m.left) + 'px';
+  list.style.right = 'auto';
+});
 
 // ---------- Changing month: wheel (desktop) and swipe (phone) ----------
 const mainEl = document.querySelector('main');

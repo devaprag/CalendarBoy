@@ -179,6 +179,13 @@ function dragTo(src, target, from, to) {
     ok('shelf + Add opens new type dialog', typeDialog.open && q('#type-form h2').textContent === 'New event type');
     click(q('[data-action="close-dialog"]'));
 
+    // Data menu opens inside the window
+    q('.menu').open = true;
+    await sleep(20);
+    const mr = q('.menu-list').getBoundingClientRect();
+    ok('Data menu stays on screen', mr.left >= 0 && mr.right <= innerWidth, Math.round(mr.left) + '..' + Math.round(mr.right));
+    q('.menu').open = false;
+
     // Migration from the phase 2 (v1) format
     const v1 = { version: 1, settings: { pretendToday: '2027-01-18', showDoneOnly: false }, types: [], events: [{ id: 'x', done: true }, { id: 'y', done: false }] };
     const m = migrate(v1);

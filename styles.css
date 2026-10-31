@@ -57,7 +57,7 @@ header h1 { margin: 0 0 0 4px; font-size: 22px; font-weight: 400; white-space: n
 .menu summary::-webkit-details-marker { display: none; }
 .menu-list {
   position: absolute; right: 0; top: calc(100% + 6px); z-index: 20;
-  min-width: 220px; padding: 6px 0;
+  min-width: 220px; max-width: calc(100vw - 16px); padding: 6px 0;
   background: var(--bg); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.2);
 }
 .menu-list button { display: block; width: 100%; padding: 8px 16px; border: 0; background: none; text-align: left; cursor: pointer; }
