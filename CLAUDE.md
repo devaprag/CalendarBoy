@@ -12,7 +12,7 @@ The owner is building it for fun and tests it on a Samsung phone as well as a PC
 - Phase 2 (habit tracker): done.
 - **Phase 3 (changes after phone testing): built.** See [Behaviour spec](#behaviour-spec).
 - All months can be browsed. The demo "playground" data covers **Nov 2026 – Mar 2027**.
-- Still a proof of concept, still **no animation**.
+- Still a proof of concept. The **only animation is the month slide** (the owner asked for it because instant month changes felt jarring). Other animation is still deferred.
 
 ## Tech
 - Plain HTML/CSS/vanilla JS, no build step, no dependencies. Open `index.html` straight in a browser (`file://` works). Don't add tooling unless the owner asks, because "just open the file" is part of the appeal.
@@ -81,6 +81,7 @@ Decided with the owner. Keep these unless the owner changes them.
 | Trips | Drag the **takeoff** icon to move **only the start**. Drag the **landing** icon to move **only the end** (start ≤ end is enforced). Drag the **dashed middle** to move the **whole trip**. The popup's start/end fields behave the same way. |
 | Months | All months: ‹ › arrows plus a **Today** button (jumps to pretend-today's month). Overflow days from neighbouring months show events and accept drops. |
 | Month by gesture | **Phone**: a horizontal swipe on the calendar (left = next, right = previous). When unlocked, swipes that start on an icon drag it instead. **Desktop**: the mouse wheel over the calendar changes month once the month's top/bottom edge is on screen; before that it scrolls the page. One wheel gesture = one month. |
+| Month slide | Changing month slides the old grid out and the new one in (260ms): **sideways** for swipes, arrows and Today; **up/down** for the wheel. Skipped when the device asks for reduced motion. |
 | "Today" | The **"Today is" date picker** sets a pretend today (default 18 Jan 2027, so the playground has a past). Data → "Use the real date as today". |
 | Show done filter | Hides **past** events that aren't done (to do or abandoned). Future events always show. |
 | Sidebar | Event types with **counts for the month on screen** (`5 / 12 done · 4 planned`, plus a progress bar when there's a goal), last done, and repeat cycle / next due / **overdue** (red). |
@@ -120,6 +121,11 @@ Decided with the owner. Keep these unless the owner changes them.
   - Swipes use **touch events**, not pointer events: when locked, the browser takes the touch for scrolling and fires `pointercancel`.
   - `main` has `touch-action: pan-y pinch-zoom`, so horizontal moves reach the page.
   - The wheel handler is non-passive so it can `preventDefault()`. `WHEEL_PAUSE_MS` keeps trackpad momentum from skipping several months.
+- **Month slide** (`goToMonth` → `snapshotWeeks` → `slideMonth`):
+  - Before re-rendering, a clone of `#weeks` is taken. It is made lifeless: `inert`, `pointer-events: none`, and the `data-id`/`data-drop`/`data-drag`/`data-action` attributes are stripped, so queries, drops and clicks never hit it.
+  - The clone slides out over the new grid inside `.weeks-wrap` (`overflow: hidden`).
+  - It is removed by a **timer**, not `onfinish`. Paused animations (background tabs, headless tests) would otherwise leave it behind.
+  - Any month change must go through `goToMonth()`.
 - **Popup and resize**: the popup closes on resize only if the **width** changes. The phone keyboard changes the height while editing.
 - **Layout**:
   - `.week` must be `flex: 1 0 auto`.
@@ -127,7 +133,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (45 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (49 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.
@@ -150,7 +156,8 @@ Decided with the owner. Keep these unless the owner changes them.
 - Commit only when asked or as part of an agreed workflow. Never force-push.
 
 ## Ideas for later (not agreed yet; ask the owner first)
-- Animation (e.g. the plane taking off on load, icons wobbling on hover). The owner explicitly deferred this.
+- More animation (e.g. the plane taking off on load, icons wobbling on hover). The owner deferred this; only the month slide exists.
+- A swipe that follows the finger (drag the month along, then let go) instead of a fixed slide.
 - Week/day views.
 - Icon refinement: the plane angles are subtle at small sizes.
 - More multi-day icon pairs (road trip, hospital stay). Custom types are single-day only for now, and `multiDay` / `endIcon` exist only on the seeded holiday type.

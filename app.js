@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '3.2';
+const APP_VERSION = '3.3';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 2;
 const MAX_VISIBLE = 3;
@@ -521,7 +521,7 @@ const ACTIONS = {
   },
   'prev-month': () => changeMonth(-1),
   'next-month': () => changeMonth(1),
-  'go-today': () => { state.settings.viewMonth = today().slice(0, 7); commit(); },
+  'go-today': () => goToMonth(today().slice(0, 7)),
   'real-today': () => setToday(key(new Date())),
   'toggle-lock': () => { state.settings.locked = !state.settings.locked; commit(); },
   'toggle-filter': () => { state.settings.showDoneOnly = !state.settings.showDoneOnly; commit(); },
@@ -582,10 +582,49 @@ todayInput.addEventListener('change', () => { if (todayInput.value) setToday(tod
 // ---------- Changing month: wheel (desktop) and swipe (phone) ----------
 const mainEl = document.querySelector('main');
 
-function changeMonth(n) {
-  state.settings.viewMonth = shiftMonth(viewMonth(), n);
+// axis: 'x' for swipes and arrows (pages turn sideways), 'y' for the mouse wheel.
+function changeMonth(n, axis = 'x') {
+  goToMonth(shiftMonth(viewMonth(), n), axis);
+}
+
+function goToMonth(ym, axis = 'x') {
+  if (ym === viewMonth()) return;
+  const dir = ym > viewMonth() ? 1 : -1;
+  const snapshot = snapshotWeeks();
+  state.settings.viewMonth = ym;
   closePopover();
   commit();
+  slideMonth(snapshot, dir, axis);
+}
+
+// ---------- Month slide animation ----------
+const SLIDE_MS = 260;
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+// A lifeless copy of the current grid, laid over the new one while it slides away.
+function snapshotWeeks() {
+  document.querySelectorAll('.weeks-leaving').forEach(el => el.remove());
+  if (reducedMotion.matches) return null;
+  const copy = weeksEl.cloneNode(true);
+  copy.removeAttribute('id');
+  copy.classList.add('weeks-leaving');
+  copy.inert = true;
+  copy.style.height = weeksEl.offsetHeight + 'px';
+  copy.querySelectorAll('[data-id], [data-date], [data-drop], [data-drag], [data-action]').forEach(el =>
+    ['data-id', 'data-date', 'data-drop', 'data-drag', 'data-action'].forEach(a => el.removeAttribute(a)));
+  return copy;
+}
+
+function slideMonth(snapshot, dir, axis) {
+  if (!snapshot) return;
+  weeksEl.after(snapshot);
+  const move = pct => `translate${axis.toUpperCase()}(${pct}%)`;
+  const timing = { duration: SLIDE_MS, easing: 'cubic-bezier(.2, .7, .3, 1)' };
+  snapshot.animate([{ transform: move(0), opacity: 1 }, { transform: move(-dir * 100), opacity: 0.3 }], timing);
+  // A timer rather than onfinish: paused animations (background tab) would otherwise leave the copy behind.
+  setTimeout(() => snapshot.remove(), SLIDE_MS + 50);
+  weeksEl.animate([{ transform: move(dir * 100) }, { transform: move(0) }], timing);
+  $('month-title').animate([{ opacity: 0 }, { opacity: 1 }], timing);
 }
 
 // The wheel scrolls the page as normal until the month's top or bottom edge is on screen; scrolling
@@ -606,7 +645,7 @@ mainEl.addEventListener('wheel', ev => {
   if (Math.abs(wheelSum) < WHEEL_THRESHOLD) return;
   wheelSum = 0;
   wheelQuietUntil = now + WHEEL_PAUSE_MS;
-  changeMonth(dir);
+  changeMonth(dir, 'y');
   // Continue from the new month's matching edge if the page is taller than the window.
   (dir > 0 ? mainEl : weeksEl).scrollIntoView({ block: dir > 0 ? 'start' : 'end' });
 }, { passive: false });

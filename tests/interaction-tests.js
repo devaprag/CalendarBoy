@@ -132,6 +132,17 @@ function dragTo(src, target, from, to) {
     click(q('[data-action="delete-type"]'));
     ok('delete type removes its events', !typeById('shopping') && !state.events.some(e => e.typeId === 'shopping'));
 
+    // Month change slides: a lifeless snapshot of the old month animates away, then is removed
+    click(q('[data-action="next-month"]'));
+    const leaving = q('.weeks-leaving');
+    ok('old month snapshot slides away', !!leaving && !leaving.querySelector('[data-id], [data-drop]') && leaving.inert);
+    ok('new month rendered underneath', q('#month-title').textContent === 'February 2027' && !!day('2027-02-13'));
+    await sleep(SLIDE_MS + 150);
+    ok('snapshot removed after the slide', !q('.weeks-leaving'));
+    click(q('[data-action="go-today"]'));
+    ok('Today slides back', q('#month-title').textContent === 'January 2027' && !!q('.weeks-leaving'));
+    await sleep(SLIDE_MS + 150);
+
     // Wheel over the calendar changes month; one gesture = one month
     const wheel = dy => q('#weeks').dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: dy }));
     ok('month fits the window (wheel test precondition)', q('#weeks').getBoundingClientRect().bottom <= innerHeight);

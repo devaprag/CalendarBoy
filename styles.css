@@ -143,7 +143,10 @@ main {
 /* ---------- Calendar grid ---------- */
 .dow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
 .dow div { padding: 6px 0; text-align: center; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .05em; }
+.weeks-wrap { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
 .weeks { flex: 1; display: flex; flex-direction: column; }
+/* Snapshot of the previous month while it slides away (see slideMonth in app.js). */
+.weeks-leaving { position: absolute; left: 0; right: 0; top: 0; pointer-events: none; }
 .week {
   position: relative; flex: 1 0 auto;
   display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
