@@ -11,7 +11,10 @@ const q = s => document.querySelector(s);
 const find = (start, title) => state.events.find(e => e.start === start && e.title === title && !e.deletedAt);
 const elOf = e => q(`.event[data-id="${e.id}"], .trip[data-id="${e.id}"]`);
 const day = k => q(`.day[data-date="${k}"]`);
-const backlogTitles = () => [...document.querySelectorAll('#backlog .event')].map(el => byId(el.dataset.id).title);
+// Jump any month slide to its end, so measured positions are where things finally sit
+// (headless Edge doesn't reliably run animation frames).
+const settle = () => document.getAnimations().forEach(a => a.finish());
+const backlogTitles =() => [...document.querySelectorAll('#backlog .event')].map(el => byId(el.dataset.id).title);
 function dragTo(src, target, from, to) {
   const a = from || center(src), b = to || center(target);
   pe('pointerdown', src, a.x, a.y); pe('pointermove', src, a.x + 10, a.y + 10); pe('pointermove', src, b.x, b.y); pe('pointerup', src, b.x, b.y);
@@ -107,6 +110,40 @@ function dragTo(src, target, from, to) {
     ok('prev month shows Lisbon trip', q('#month-title').textContent === 'December 2026' && !!q('.trip[title="Christmas in Lisbon"]'));
     click(q('[data-action="go-today"]'));
     ok('Today button', q('#month-title').textContent === 'January 2027');
+    await sleep(SLIDE_MS + 100);
+
+    // Holding a dragged icon at the calendar edge turns the month
+    const mover = find('2027-01-27', 'Gym: upper body') || state.events.find(e => e.typeId === 'gym' && e.start === '2027-01-27');
+    const wr = q('.weeks-wrap').getBoundingClientRect(), mc = center(elOf(mover));
+    pe('pointerdown', elOf(mover), mc.x, mc.y); pe('pointermove', document.body, mc.x + 10, mc.y);
+    pe('pointermove', document.body, wr.right - 10, mc.y);
+    ok('edge hint shows', q('.weeks-wrap').classList.contains('edge-next'));
+    await sleep(EDGE_DELAY_MS + 100);
+    ok('holding at the right edge -> next month', q('#month-title').textContent === 'February 2027');
+    await sleep(EDGE_REPEAT_MS);
+    ok('keeps turning while held', q('#month-title').textContent === 'March 2027');
+    await sleep(SLIDE_MS + 100);
+    pe('pointermove', document.body, wr.left - 5 + EDGE_PX * 3, mc.y);
+    ok('leaving the edge stops it', !q('.weeks-wrap').classList.contains('edge-next') && !edgeTimer);
+    settle();
+    const d = center(day('2027-03-10'));
+    pe('pointermove', document.body, d.x, d.y); pe('pointerup', document.body, d.x, d.y); click(document.body);
+    ok('drop lands in the new month', mover.start === '2027-03-10', mover.start);
+    // Left edge goes back; hovering the bin never turns the month
+    settle();
+    const mc2 = center(elOf(mover));
+    pe('pointerdown', elOf(mover), mc2.x, mc2.y); pe('pointermove', document.body, mc2.x + 10, mc2.y);
+    pe('pointermove', document.body, wr.left + 5, mc2.y);
+    await sleep(EDGE_DELAY_MS + 100);
+    ok('holding at the left edge -> previous month', q('#month-title').textContent === 'February 2027');
+    const bc = center(q('#bin'));
+    updateEdgeFlip(wr.right - 5, bc.y, q('#bin'));
+    ok('hovering the bin is not an edge', !edgeTimer && !q('.weeks-wrap').classList.contains('edge-next'));
+    pe('pointercancel', document.body, 0, 0);
+    ok('cancelled drag clears the edge state', !edgeTimer && !document.body.classList.contains('dragging'));
+    await sleep(SLIDE_MS + 100);
+    click(q('[data-action="go-today"]'));
+    await sleep(SLIDE_MS + 100);
 
     // Show done filter: hides past to-do and abandoned, keeps done and the future
     click(q('[data-action="reset"]'));

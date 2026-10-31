@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.1';
+const APP_VERSION = '4.2';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 const MAX_VISIBLE = 3;
@@ -752,7 +752,35 @@ document.addEventListener('pointermove', ev => {
     marker?.classList.add('insert-before');
     insertMarker = marker;
   }
+  updateEdgeFlip(ev.clientX, ev.clientY, target);
 });
+
+// Holding a dragged icon at the calendar's left/right edge turns the month (and keeps turning while held).
+const EDGE_PX = 36, EDGE_DELAY_MS = 600, EDGE_REPEAT_MS = 900;
+const weeksWrap = weeksEl.parentElement;
+let edgeDir = 0, edgeTimer = null;
+
+function updateEdgeFlip(x, y, target) {
+  const r = weeksWrap.getBoundingClientRect(); // the wrapper doesn't move during the slide
+  // The bin sits over the calendar's bottom-right corner on phones; hovering it isn't an edge.
+  const dir = y < r.top || y > r.bottom || target?.dataset.drop === 'bin' ? 0
+    : x < r.left + EDGE_PX ? -1 : x > r.right - EDGE_PX ? 1 : 0;
+  weeksWrap.style.setProperty('--edge-y', (y - r.top) + 'px');
+  if (dir === edgeDir) return;
+  stopEdgeFlip();
+  edgeDir = dir;
+  if (!dir) return;
+  weeksWrap.classList.add(dir < 0 ? 'edge-prev' : 'edge-next');
+  const flip = () => { changeMonth(edgeDir); edgeTimer = setTimeout(flip, EDGE_REPEAT_MS); };
+  edgeTimer = setTimeout(flip, EDGE_DELAY_MS);
+}
+
+function stopEdgeFlip() {
+  clearTimeout(edgeTimer);
+  edgeTimer = null;
+  edgeDir = 0;
+  weeksWrap.classList.remove('edge-prev', 'edge-next');
+}
 
 document.addEventListener('pointerup', ev => {
   if (press) {
@@ -814,6 +842,7 @@ function startDrag() {
 }
 
 function endDrag() {
+  stopEdgeFlip();
   ghost?.remove();
   ghost = null;
   hoverTarget?.classList.remove('drop-hover');

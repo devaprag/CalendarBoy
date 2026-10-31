@@ -99,6 +99,7 @@ Decided with the owner. Keep these unless the owner changes them.
 | Months | All months: ‹ › arrows plus a **Today** button (jumps to pretend-today's month). Overflow days from neighbouring months show events and accept drops. |
 | Month by gesture | **Phone**: a horizontal swipe on the calendar (left = next, right = previous). When unlocked, swipes that start on an icon drag it instead. **Desktop**: the mouse wheel over the calendar changes month once the month's top/bottom edge is on screen; before that it scrolls the page. One wheel gesture = one month. |
 | Month slide | Changing month slides the old grid out and the new one in (260ms): **sideways** for swipes, arrows and Today; **up/down** for the wheel. Skipped when the device asks for reduced motion. |
+| Drag to the edge | While dragging, holding the icon within 36px of the calendar's left/right edge turns the month after 0.6s, and keeps turning every 0.9s while held. A blue edge strip with an arrow just above the finger shows it's about to turn. Hovering the bin (which overlaps the bottom-right corner on phones) never counts as the edge. |
 | "Today" | The **"Today is" date picker** sets a pretend today (default 18 Jan 2027, so the playground has a past). Data → "Use the real date as today". |
 | Show done filter | Hides **past** events that aren't done (to do or abandoned). Future events always show. |
 | Sidebar | Event types with **counts for the month on screen** (`5 / 12 done · 4 planned`, plus a progress bar when there's a goal), last done, and repeat cycle / next due / **overdue** (red). On phones it sits below the calendar and **collapses/expands** by tapping its heading (`settings.statsCollapsed`, remembered; expanded by default). On desktop it is always open. |
@@ -151,10 +152,11 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (65 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (73 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.
+  - Call `settle()` (finishes running animations) before measuring positions after a month change. Headless Edge doesn't reliably run animation frames, so a mid-slide grid gives off-screen coordinates and flaky tests.
 - **Screenshots**:
   ```bash
   E="/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
