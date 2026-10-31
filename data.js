@@ -53,7 +53,7 @@ const SEED = (() => {
   const away = k => TRIPS.some(([from, to]) => k >= from && k <= to);
   const events = [];
   const add = (typeId, start, title, time, status, notes = '', end = null) =>
-    events.push({ id: 'e' + (events.length + 1), typeId, title, start, end, time, notes, status, deletedAt: null });
+    events.push({ id: 'e' + (events.length + 1), typeId, title, start, end, time, notes, status, deletedAt: null, seq: events.length });
   // Past routine events are mostly done; a fixed pattern marks a few as missed (to do) or abandoned.
   const status = (k, i, todoEvery, abandonEvery) => k > TODAY ? 'todo'
     : (i + 3) % todoEvery === 0 ? 'todo' : (i + 2) % abandonEvery === 0 ? 'abandoned' : 'done';
@@ -99,7 +99,7 @@ const SEED = (() => {
   add('call', null, 'Video call with cousins', '', 'todo');
 
   return {
-    version: 2,
+    version: 3,
     settings: { pretendToday: TODAY, viewMonth: '2027-01', showDoneOnly: false, locked: true },
     types: [
       { id: 'movie',     name: 'Movie',            icon: 'camera',       color: 'purple', goalPerMonth: 2,    cycleDays: null },

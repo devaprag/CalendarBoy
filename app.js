@@ -1,8 +1,8 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '3.6';
+const APP_VERSION = '4.0';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
-const STATE_VERSION = 2;
+const STATE_VERSION = 3;
 const MAX_VISIBLE = 3;
 const DEFAULT_TRIP_DAYS = 3;
 const LONG_PRESS_MS = 500;
@@ -26,13 +26,21 @@ function migrate(s) {
     Object.assign(s.settings, { locked: true, viewMonth: s.settings.pretendToday.slice(0, 7) });
     s.version = 2;
   }
+  if (s && s.version === 2) {
+    // Backlog order moves from array position to a `seq` number, so it survives syncing item by item.
+    s.events.forEach((e, i) => { e.seq = i; });
+    s.version = 3;
+  }
   return s;
 }
 function isValidState(s) {
   return !!s && s.version === STATE_VERSION && !!s.settings && Array.isArray(s.types) && Array.isArray(s.events);
 }
+// Set by sync.js: syncHook pushes changes to the cloud after every save; syncAccount is the signed-in email.
+let syncHook = null, syncAccount = null;
 function saveState() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (err) { /* ignore */ }
+  syncHook?.();
 }
 function commit() { saveState(); render(); }
 
@@ -49,12 +57,14 @@ function fmtShort(k) { return parseDate(k).toLocaleDateString('en-GB', { day: 'n
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 // ---------- Queries ----------
-const today = () => state.settings.pretendToday;
+// A null pretendToday means the real date.
+const today = () => state.settings.pretendToday || key(new Date());
 const viewMonth = () => state.settings.viewMonth;
 const typeOf = e => state.types.find(t => t.id === e.typeId);
 const typeById = id => state.types.find(t => t.id === id);
 const byId = id => state.events.find(e => e.id === id);
-const live = () => state.events.filter(e => !e.deletedAt);
+// Events whose type is missing are skipped (while syncing, events can arrive before their types).
+const live = () => state.events.filter(e => !e.deletedAt && typeOf(e));
 const scheduled = () => live().filter(e => e.start);
 const isTrip = e => !!typeOf(e)?.multiDay;
 const isPast = e => !!e.start && e.start <= today(); // today counts as the past
@@ -220,7 +230,7 @@ function renderTypes() {
 }
 
 function renderBacklog() {
-  const items = live().filter(e => !e.start);
+  const items = live().filter(e => !e.start).sort(bySeq);
   backlogEl.innerHTML = items.length
     ? items.map(renderEvent).join('')
     : '<p class="empty">Drop events here for “someday”.</p>';
@@ -265,13 +275,15 @@ function unschedule(e) {
   e.end = null;
 }
 
-// The backlog's order is the order of its events in state.events.
+// Backlog order comes from each event's `seq`; a moved event gets a seq between its new neighbours.
+const bySeq = (a, b) => (a.seq ?? 0) - (b.seq ?? 0);
 function placeInBacklog(e, beforeId) {
   unschedule(e);
-  state.events.splice(state.events.indexOf(e), 1);
-  const i = beforeId ? state.events.findIndex(x => x.id === beforeId) : -1;
-  if (i === -1) state.events.push(e);
-  else state.events.splice(i, 0, e);
+  const items = live().filter(x => !x.start && x !== e).sort(bySeq);
+  const i = beforeId ? items.findIndex(x => x.id === beforeId) : -1;
+  if (i === -1) e.seq = items.length ? (items[items.length - 1].seq ?? 0) + 1 : 0;
+  else if (i === 0) e.seq = (items[0].seq ?? 0) - 1;
+  else e.seq = ((items[i - 1].seq ?? 0) + (items[i].seq ?? 0)) / 2;
 }
 
 function addEvent(type, start, beforeId) {
@@ -368,7 +380,7 @@ function dayList(k) {
 }
 
 function binList() {
-  const items = state.events.filter(e => e.deletedAt).sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+  const items = state.events.filter(e => e.deletedAt && typeOf(e)).sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
   if (!items.length) return '<p class="pop-heading">Recycling bin</p><p class="empty">The bin is empty.</p>';
   return `<p class="pop-heading">Recycling bin</p>
     ${items.map(e => `<div class="bin-item">${chip(typeOf(e))}
@@ -493,16 +505,27 @@ importInput.addEventListener('change', () => {
   reader.readAsText(file);
 });
 
+// When signed in, these replace the calendar in the account too (sync pushes the difference).
+const ALSO_IN_ACCOUNT = () => (syncAccount ? '\n\nThis also replaces the calendar saved in your account.' : '');
+
 function resetData() {
-  if (!confirm('Replace everything with the demo data?')) return;
+  if (!confirm('Replace everything with the demo data?' + ALSO_IN_ACCOUNT())) return;
   state = structuredClone(SEED);
   closePopover();
   commit();
 }
 
+// An empty calendar for real use: keeps the event types and this device's settings, follows the real date.
+function startFresh() {
+  if (!confirm('Start fresh? All events are deleted (event types are kept) and today becomes the real date.' + ALSO_IN_ACCOUNT())) return;
+  state.events = [];
+  setToday(null);
+}
+
+// null = follow the real date.
 function setToday(k) {
   state.settings.pretendToday = k;
-  state.settings.viewMonth = k.slice(0, 7);
+  state.settings.viewMonth = today().slice(0, 7);
   closePopover();
   commit();
 }
@@ -525,7 +548,8 @@ const ACTIONS = {
   'prev-month': () => changeMonth(-1),
   'next-month': () => changeMonth(1),
   'go-today': () => goToMonth(today().slice(0, 7)),
-  'real-today': () => setToday(key(new Date())),
+  'real-today': () => setToday(null),
+  'start-fresh': startFresh,
   'toggle-lock': () => { state.settings.locked = !state.settings.locked; commit(); },
   'toggle-stats': () => { state.settings.statsCollapsed = !state.settings.statsCollapsed; commit(); },
   'toggle-filter': () => { state.settings.showDoneOnly = !state.settings.showDoneOnly; commit(); },

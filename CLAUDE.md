@@ -56,17 +56,34 @@ The owner is building it for fun and tests it on a Samsung phone as well as a PC
 Stored in localStorage key `calendarBoy.v1`. The key name is historical; the object carries `version`. Export uses the same JSON shape.
 ```js
 {
-  version: 2,
-  settings: { pretendToday: '2027-01-18', viewMonth: '2027-01', showDoneOnly: false, locked: true },
+  version: 3,
+  settings: { pretendToday: '2027-01-18'|null, viewMonth: '2027-01', showDoneOnly: false, locked: true, statsCollapsed? },
   types: [{ id, name, icon, color, goalPerMonth|null, cycleDays|null, multiDay?, endIcon? }],
-  events: [{ id, typeId, title, start|null, end|null, time, notes, status: 'todo'|'done'|'abandoned', deletedAt|null, days? }]
+  events: [{ id, typeId, title, start|null, end|null, time, notes, status: 'todo'|'done'|'abandoned', deletedAt|null, seq, days? }]
 }
 ```
-- `start: null` means the event is in the **backlog**. The backlog's **order is the order of `state.events`**, so `placeInBacklog()` splices to reorder.
+- `pretendToday: null` means **follow the real date**. That's the normal setting for real use; "Start fresh" and "Use the real date" set it.
+- `start: null` means the event is in the **backlog**. Backlog **order comes from `seq`**, not array position, so it survives item-by-item syncing. `placeInBacklog()` gives a moved event a `seq` between its new neighbours.
 - `deletedAt` set means it is in the **bin**.
 - `end` is set only for trips. `days` remembers a trip's length while it sits in the backlog.
 - Past/future is **derived** from `pretendToday` (today counts as past); never store it.
-- When the shape changes: bump `STATE_VERSION`, and add a step to `migrate()` so saved data on the owner's phone survives. `migrate()` already handles v1 (`done: bool`) → v2 (`status`). Import goes through `migrate()` too.
+- When the shape changes: bump `STATE_VERSION`, and add a step to `migrate()` so saved data on the owner's phone survives. `migrate()` already handles v1 (`done: bool`) → v2 (`status`) → v3 (`seq`). Import goes through `migrate()` too.
+- **The owner uses this for real now.** Never ship a change that could lose or silently reset their saved data.
+
+## Cloud sync (`sync.js`, Firebase)
+- **Setup**: Google sign-in + Firestore, loaded from the gstatic CDN (compat build, pinned version) **only** when `firebase-config.js` has a config and the page is served over http(s). On `file://` sync is off, because Google sign-in needs a real domain. The owner's setup steps are in the README.
+- **Data layout**: `users/{uid}/types/{id}` and `users/{uid}/events/{id}`, one document per item (the `id` field is left out of the document). Settings are **per device and not synced**.
+- **Push**: `syncHook` runs `pushChanges()` after every `saveState()`. It diffs `state` against `synced` (id → canonical JSON of what the cloud holds) and batch-writes only the differences: sets, and deletes for items that disappeared. So every way of changing data syncs without special cases.
+- **Pull**: `onSnapshot` listeners → `applyRemote()`.
+  - On the **first snapshot after sign-in**, the account's copy replaces local data for that collection. An empty first snapshot *from the device cache* is ignored.
+  - After that, changes are applied one item at a time. An item whose JSON matches `synced` is our own write echoing back, and is skipped.
+- **First sign-in on a device** (`SYNCED_UID_KEY` in localStorage differs): if the account is empty, the device uploads its calendar. Otherwise the owner chooses: take the account's calendar, or add this device's events to it. Signing out clears the key, so the next sign-in asks again.
+- **Offline**: Firestore persistence (`enablePersistence`) keeps a device copy and queues writes.
+- **Conflicts**: different items merge; the same item edited on two devices = last write wins.
+- **Rendering**: events can arrive before their types, so `live()` skips events with no type.
+- **Status dot** on the Data button: green synced, amber syncing/offline, red error. The menu shows details and Sign in / Sign out.
+- **Cost**: free Spark plan. Each app open that's more than 30 minutes after the last one re-reads every document, so thousands of events times many opens a day could approach the 50k reads/day free limit. That's fine for years of personal use; revisit if it grows.
+- **Tests** cover the sync logic with a fake Firestore. Real Firebase and Google sign-in are **not** covered.
 
 ## Behaviour spec
 Decided with the owner. Keep these unless the owner changes them.
@@ -86,7 +103,7 @@ Decided with the owner. Keep these unless the owner changes them.
 | Show done filter | Hides **past** events that aren't done (to do or abandoned). Future events always show. |
 | Sidebar | Event types with **counts for the month on screen** (`5 / 12 done · 4 planned`, plus a progress bar when there's a goal), last done, and repeat cycle / next due / **overdue** (red). On phones it sits below the calendar and **collapses/expands** by tapping its heading (`settings.statsCollapsed`, remembered; expanded by default). On desktop it is always open. |
 | Deleting a type | Deletes all its events permanently, after a confirm showing the count. |
-| Other | The recycling bin (bottom right) restores items or empties. Data menu: Export / Import JSON, Reset demo data. |
+| Other | The recycling bin (bottom right) restores items or empties. Data menu: sync status + Sign in/out, Use the real date, **Start fresh** (empty calendar, keeps types, real date), Export / Import JSON, Reset demo data. |
 
 ## Conventions
 - **Icon style**: flat fills, thick dark outline (`OUTLINE`), 64×64 viewBox, readable at 26px. New icons go in `ICONS`, plus `ICON_LIBRARY` if users should be able to pick them.
@@ -100,7 +117,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Releasing (cache busting)
 - **Every release that changes CSS or JS must bump the version** in two places:
-  1. The `?v=` on all four asset links in `index.html`.
+  1. The `?v=` on all the asset links in `index.html`.
   2. `APP_VERSION` at the top of `app.js`.
 - **Why:** GitHub Pages serves files with `max-age=600`, and Chrome on Android keeps using cached scripts even after a pull-to-refresh. Once, the owner's phone ran the new `index.html` with the old `app.js`: no lock, no Add icons, dead month buttons, no long-press.
 - The Data menu shows `Version x` from `app.js`, so the owner can check which code their phone is running. If the menu says "Old app.js still cached", the HTML and JS are out of step.
@@ -134,7 +151,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (54 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (65 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.
@@ -162,4 +179,4 @@ Decided with the owner. Keep these unless the owner changes them.
 - Week/day views.
 - Icon refinement: the plane angles are subtle at small sizes.
 - More multi-day icon pairs (road trip, hospital stay). Custom types are single-day only for now, and `multiDay` / `endIcon` exist only on the seeded holiday type.
-- Real file storage (File System Access API, or a tiny local server) if localStorage + export isn't enough.
+

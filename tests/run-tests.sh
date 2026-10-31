@@ -11,7 +11,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 # Copy of index.html with absolute asset URLs plus the test script, so it can live in a temp dir.
 sed -e "s#href=\"styles.css\([^\"]*\)\"#href=\"$URL_ROOT/styles.css\1\"#" \
-    -e "s#src=\"\(icons\|data\|app\)\.js\([^\"]*\)\"#src=\"$URL_ROOT/\1.js\2\"#" \
+    -e "s#src=\"\([a-z-]*\.js[^\"]*\)\"#src=\"$URL_ROOT/\1\"#" \
     -e "s#</body>#<script src=\"$URL_ROOT/tests/interaction-tests.js\"></script></body>#" \
     "$ROOT/index.html" > "$TMP/harness.html"
 

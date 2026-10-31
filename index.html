@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Calendar Boy</title>
-<link rel="stylesheet" href="styles.css?v=3.6">
+<link rel="stylesheet" href="styles.css?v=4.0">
 </head>
 <body class="locked">
 
@@ -20,9 +20,11 @@
   </label>
   <button class="toggle" id="filter-btn" data-action="toggle-filter" aria-pressed="false" title="Hide past events that weren't done">&#10003; Show done</button>
   <details class="menu">
-    <summary>Data</summary>
+    <summary>Data <span class="sync-badge" id="sync-badge"></span></summary>
     <div class="menu-list">
+      <div id="sync-menu"></div>
       <button data-action="real-today">Use the real date as today</button>
+      <button data-action="start-fresh">Start fresh (empty calendar)</button>
       <button data-action="export">Export JSON</button>
       <button data-action="import">Import JSON&hellip;</button>
       <button data-action="reset">Reset demo data</button>
@@ -77,8 +79,10 @@
 <dialog id="type-dialog"><form id="type-form"></form></dialog>
 
 <!-- Plain scripts, not modules: modules and fetch() are blocked on file:// -->
-<script src="icons.js?v=3.6"></script>
-<script src="data.js?v=3.6"></script>
-<script src="app.js?v=3.6"></script>
+<script src="icons.js?v=4.0"></script>
+<script src="data.js?v=4.0"></script>
+<script src="firebase-config.js?v=4.0"></script>
+<script src="app.js?v=4.0"></script>
+<script src="sync.js?v=4.0"></script>
 </body>
 </html>

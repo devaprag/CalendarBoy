@@ -186,6 +186,53 @@ function dragTo(src, target, from, to) {
     ok('Data menu stays on screen', mr.left >= 0 && mr.right <= innerWidth, Math.round(mr.left) + '..' + Math.round(mr.right));
     q('.menu').open = false;
 
+    // Cloud sync logic, against a fake Firestore that records writes
+    click(q('[data-action="reset"]'));
+    ok('sync off on file:// pages', syncStatus.state === 'local' && !fb);
+    const writes = [];
+    fb = { user: { uid: 'u1', email: 'me@example.com' }, unsubscribe: [], db: {
+      collection: () => ({ doc: () => ({ collection: name => ({ doc: id => ({ name, id }) }) }) }),
+      batch: () => ({ set: (ref, data) => writes.push(['set', ref.name, ref.id, data]), delete: ref => writes.push(['delete', ref.name, ref.id]), commit: () => Promise.resolve() }),
+    } };
+    const snapOf = (items, changes = [], meta = {}) => ({
+      docs: items.map(d => ({ id: d.id, data: () => toDoc(d) })), empty: !items.length, size: items.length,
+      docChanges: () => changes, metadata: { hasPendingWrites: false, fromCache: false, ...meta },
+    });
+    const cloudCopy = structuredClone(state);
+    fresh = { types: true, events: true }; ready = false; synced = emptySynced();
+    applyRemote('events', snapOf([], [], { fromCache: true }));
+    ok('empty first answer from device cache is ignored', fresh.events && state.events.length === cloudCopy.events.length);
+    applyRemote('types', snapOf(cloudCopy.types)); applyRemote('events', snapOf(cloudCopy.events));
+    ok('first snapshot loads the account copy, then pushing starts', ready && synced.events.size === cloudCopy.events.length && writes.length === 0);
+    const synEv = find('2027-01-22', 'Cinema with Alex');
+    cycleStatus(synEv.id);
+    await sleep(0);
+    ok('a tap uploads just that event', writes.length === 1 && writes[0][0] === 'set' && writes[0][2] === synEv.id && writes[0][3].status === 'done', JSON.stringify(writes));
+    writes.length = 0;
+    applyRemote('events', snapOf([], [{ type: 'modified', doc: { id: synEv.id, data: () => ({ ...toDoc(synEv), title: 'Cinema (changed on phone)' }) } }]));
+    ok('change from the other device shows up', byId(synEv.id).title === 'Cinema (changed on phone)' && !!q(`.event[data-id="${synEv.id}"]`));
+    ok('...and is not echoed back', writes.length === 0);
+    applyRemote('events', snapOf([], [{ type: 'removed', doc: { id: synEv.id, data: () => ({}) } }]));
+    ok('deletion from the other device', !byId(synEv.id));
+    applyRemote('events', snapOf([], [{ type: 'added', doc: { id: 'zz', data: () => ({ typeId: 'not-yet', title: 'Early', start: '2027-01-05', end: null, time: '', notes: '', status: 'todo', deletedAt: null }) } }]));
+    ok('event arriving before its type does not break the page', !!byId('zz') && !q('[data-id="zz"]') && !!q('#weeks .day'));
+    state.events = state.events.filter(e => e.id !== 'zz'); synced.events.delete('zz');
+    writes.length = 0;
+    const doomed = find('2027-01-23', 'Catch-up with Jo');
+    removeEvent(doomed.id);
+    click(q('#bin')); click(q('[data-action="empty-bin"]'));
+    await sleep(0);
+    ok('emptying the bin deletes in the account', writes.some(w => w[0] === 'delete' && w[2] === doomed.id));
+    fb = null; ready = false; syncAccount = null; synced = emptySynced();
+    click(document.body);
+
+    // Real date and Start fresh
+    click(q('[data-action="real-today"]'));
+    ok('"use real date" follows the clock', state.settings.pretendToday === null && today() === key(new Date()) && todayInput.value === today());
+    const typeCount = state.types.length;
+    click(q('[data-action="start-fresh"]'));
+    ok('start fresh empties events, keeps types', state.events.length === 0 && state.types.length === typeCount && state.settings.pretendToday === null);
+
     // Migration from the phase 2 (v1) format
     const v1 = { version: 1, settings: { pretendToday: '2027-01-18', showDoneOnly: false }, types: [], events: [{ id: 'x', done: true }, { id: 'y', done: false }] };
     const m = migrate(v1);
