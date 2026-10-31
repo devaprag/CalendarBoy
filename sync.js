@@ -110,6 +110,7 @@ function loadScript(src) {
 async function initSync() {
   if (location.protocol === 'file:') return setSyncStatus('local');
   if (!FIREBASE_CONFIG) return setSyncStatus('off');
+  setSyncStatus('connecting');
   try {
     for (const f of ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js']) await loadScript(FIREBASE_SDK + f);
   } catch (err) {
@@ -192,6 +193,7 @@ function signOut() {
 const SYNC_LABEL = {
   off: 'Cloud sync is not set up',
   local: 'Open the online version to sync',
+  connecting: 'Connecting…',
   'signed-out': 'Not syncing',
   syncing: 'Syncing…',
   synced: 'Synced',

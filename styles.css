@@ -68,7 +68,7 @@ header h1 { margin: 0 0 0 4px; font-size: 22px; font-weight: 400; white-space: n
 .sync-badge { display: inline-block; width: 8px; height: 8px; margin: 0 6px 1px 2px; border-radius: 50%; background: var(--faded); }
 .sync-badge.off, .sync-badge.local { display: none; }
 .sync-badge.synced { background: #34a853; }
-.sync-badge.syncing, .sync-badge.offline { background: #f9ab00; }
+.sync-badge.syncing, .sync-badge.offline, .sync-badge.connecting { background: #f9ab00; }
 .sync-badge.error { background: var(--danger); }
 .menu-version { margin: 4px 0 0; padding: 6px 16px 2px; border-top: 1px solid var(--hover); font-size: 11px; color: var(--muted); }
 
