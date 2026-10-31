@@ -10,8 +10,8 @@ TMP="$(cd "$(mktemp -d)" && (pwd -W 2>/dev/null || pwd))"
 trap 'rm -rf "$TMP"' EXIT
 
 # Copy of index.html with absolute asset URLs plus the test script, so it can live in a temp dir.
-sed -e "s#href=\"styles.css\"#href=\"$URL_ROOT/styles.css\"#" \
-    -e "s#src=\"\(icons\|data\|app\)\.js\"#src=\"$URL_ROOT/\1.js\"#" \
+sed -e "s#href=\"styles.css\([^\"]*\)\"#href=\"$URL_ROOT/styles.css\1\"#" \
+    -e "s#src=\"\(icons\|data\|app\)\.js\([^\"]*\)\"#src=\"$URL_ROOT/\1.js\2\"#" \
     -e "s#</body>#<script src=\"$URL_ROOT/tests/interaction-tests.js\"></script></body>#" \
     "$ROOT/index.html" > "$TMP/harness.html"
 

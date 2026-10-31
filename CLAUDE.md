@@ -96,6 +96,13 @@ Decided with the owner. Keep these unless the owner changes them.
 - **Dates**: `YYYY-MM-DD` string keys, compared as strings. `parseDate` builds a *local* Date; never `new Date('2027-01-14')` (that's UTC). Display is `en-GB`. Weeks start on **Sunday**.
 - **Comments**: match the existing density (sparse; only where something isn't obvious). CSS sections are marked `/* ---------- Name ---------- */`, with one `@media (max-width: 800px)` block at the end.
 
+## Releasing (cache busting)
+- **Every release that changes CSS or JS must bump the version** in two places:
+  1. The `?v=` on all four asset links in `index.html`.
+  2. `APP_VERSION` at the top of `app.js`.
+- **Why:** GitHub Pages serves files with `max-age=600`, and Chrome on Android keeps using cached scripts even after a pull-to-refresh. Once, the owner's phone ran the new `index.html` with the old `app.js`: no lock, no Add icons, dead month buttons, no long-press.
+- The Data menu shows `Version x` from `app.js`, so the owner can check which code their phone is running. If the menu says "Old app.js still cached", the HTML and JS are out of step.
+
 ## Gotchas (don't reintroduce)
 - **Status changes update classes in place** (`setStatus`) and re-render only the sidebar. The icon stays put while you cycle it, even if Show done would now hide it.
 - **Press handling** (`pointerdown` → `press`):

@@ -1,4 +1,6 @@
 // ---------- Constants ----------
+// Keep in step with the ?v= on the asset links in index.html; bump both on every release.
+const APP_VERSION = '3.1';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 2;
 const MAX_VISIBLE = 3;
@@ -716,4 +718,5 @@ function drop(p, target, x, y) {
 
 // ---------- Start ----------
 $('brand-icon').innerHTML = ICONS.camera;
+$('app-version').textContent = `Version ${APP_VERSION}`;
 render();
