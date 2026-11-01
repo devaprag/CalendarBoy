@@ -34,7 +34,7 @@ The owner is building it for fun and tests it on a Samsung phone as well as a PC
   - `bin`, `binFull`, `lock` and `unlock` are UI-only icons.
 - **`data.js`**
   - `COLORS` is the 8-colour palette, `{ c, tint }`.
-  - `ICON_LIBRARY` lists the icons the type editor offers.
+  - `ICON_CATEGORIES` lists the ~50 icons the type editor offers, in groups (Fun & social, Fitness, Health, …). The groups only exist in the editor; types and events don't store them. `ICON_LIBRARY` is the same list, flattened.
   - `PRESET_TYPES` holds the predefined types.
   - `SEED` is **generated** by an IIFE:
     - Gym Mon/Wed/Fri, groceries Saturday, Gran call Sunday, and bedsheets every 2 weeks, from Nov 2026 to Mar 2027. Routines are skipped while away on a trip.
@@ -59,7 +59,7 @@ Stored in localStorage key `calendarBoy.v1`. The key name is historical; the obj
 ```js
 {
   version: 3,
-  settings: { pretendToday: '2027-01-18'|null, viewMonth: '2027-01', showDoneOnly: false, locked: true, statsCollapsed?, shelfCollapsed? },
+  settings: { pretendToday: '2027-01-18'|null, viewMonth: '2027-01', showDoneOnly: false, locked: true, statsCollapsed?, shelfCollapsed?, recentTypes? },
   types: [{ id, name, icon, color, goalPerMonth|null, cycleDays|null, multiDay?, endIcon? }],
   events: [{ id, typeId, title, start|null, end|null, time, notes, status: 'todo'|'done'|'abandoned', deletedAt|null, seq, days?,
              distance?, moving?, stravaId? }]
@@ -100,7 +100,7 @@ Decided with the owner. Keep these unless the owner changes them.
 | Details popup | **Long-press** (500ms) on touch or mouse, or **right-click** on desktop. Double-click was dropped because two taps cycle the status twice. The popup has status buttons, title/time/notes/date fields, **Duplicate** (the copy lands on the next day as To do) and **Remove** (to the bin). |
 | Lock | The 🔒 button: in the shelf on desktop, and a **floating round button bottom-left on phones** (mirroring the bin bottom-right). **Locked by default**, and remembered. When locked nothing can be dragged, so scrolling on a phone never moves icons. Tap and long-press still work. |
 | Top bar | The header (title, month, Today, Data…) and the shelf under it form `.topbar`, **always on screen**: on desktop nothing else scrolls; on phones it's `position: sticky` while the page scrolls. |
-| Shelf (under the header, full width) | Lock + **Add palette** (type icons to drag onto a day or the backlog) + **Backlog** (drop zone; drag items into a new **order**). On phones the "Add" label is a **+ Add button** that opens the new-event-type dialog. **Collapsible** with its Hide / "Add & backlog" button (`settings.shelfCollapsed`, per device, expanded by default); collapsed, it keeps only the lock (desktop) and that button. |
+| Shelf (under the header, full width) | Lock + **Add palette** (shortcut icons to drag onto a day or the backlog: the **10 most recently used types, newest first**. Adding an event of a type, by drop or by tapping a due ghost, or creating a type, moves it to the front. Unused types fill any empty slots in sidebar order. `settings.recentTypes`, per device. Types outside the 10 can be dragged from their **sidebar icon** instead) + **Backlog** (drop zone; drag items into a new **order**). On phones the "Add" label is a **+ Add button** that opens the new-event-type dialog. **Collapsible** with its Hide / "Add & backlog" button (`settings.shelfCollapsed`, per device, expanded by default); collapsed, it keeps only the lock (desktop) and that button. |
 | Desktop layout | The window never scrolls. The month fills the space under the top bar (weeks share the height), and **only the Event types sidebar scrolls**. If the window is too short for the weeks' minimum height (90px), the calendar column scrolls instead. |
 | Trips | Drag the **takeoff** icon to move **only the start**. Drag the **landing** icon to move **only the end** (start ≤ end is enforced). Drag the **dashed middle** to move the **whole trip**. The popup's start/end fields behave the same way. |
 | Months | All months: ‹ › arrows plus a **Today** button (jumps to pretend-today's month). Overflow days from neighbouring months show events and accept drops. |
@@ -121,7 +121,7 @@ Decided with the owner. Keep these unless the owner changes them.
 | Other | The recycling bin (bottom right) restores items or empties. Data menu: sync status + Sign in/out, Use the real date, **Start fresh** (empty calendar, keeps types, real date), Export / Import JSON, Reset demo data. |
 
 ## Conventions
-- **Icon style**: flat fills, thick dark outline (`OUTLINE`), 64×64 viewBox, readable at 26px. New icons go in `ICONS`, plus `ICON_LIBRARY` if users should be able to pick them.
+- **Icon style**: flat fills, thick dark outline (`OUTLINE`), 64×64 viewBox, readable at 26px. New icons go in `ICONS`, plus a group in `ICON_CATEGORIES` if users should be able to pick them.
 - **Colours**:
   - A type's colour is a `COLORS` key. `colorVars(type)` sets `--c` (ring, path, progress bar) and `--tint` (chip background) inline.
   - Don't name a CSS variable `--bg`, because that's the page background token.
@@ -170,7 +170,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (123 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (131 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.

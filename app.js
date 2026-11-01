@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.6';
+const APP_VERSION = '4.7';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 // Items per day before "+N more" on phones. On wide screens the month fills the window and
@@ -237,9 +237,20 @@ function render() {
   renderBin();
 }
 
+// Shortcut icons: the most recently used types first (settings.recentTypes, per device), topped up
+// with the rest in sidebar order. Every type can also be dragged from the sidebar.
+const PALETTE_SIZE = 10;
+function paletteTypes() {
+  const recent = (state.settings.recentTypes || []).map(typeById).filter(Boolean);
+  return [...recent, ...state.types.filter(t => !recent.includes(t))].slice(0, PALETTE_SIZE);
+}
+function markUsed(typeId) {
+  state.settings.recentTypes = [typeId, ...(state.settings.recentTypes || []).filter(id => id !== typeId)].slice(0, 50);
+}
+
 function renderPalette() {
   const how = state.settings.locked ? 'unlock, then drag onto a day' : 'drag onto a day or the backlog';
-  paletteEl.innerHTML = state.types.map(t =>
+  paletteEl.innerHTML = paletteTypes().map(t =>
     `<span class="type-chip" data-drag="type" data-type-id="${t.id}" title="${esc(t.name)}: ${how}">${chip(t)}</span>`).join('');
 }
 
@@ -348,7 +359,7 @@ function renderTypes() {
       cycle = `<div class="stat${overdue ? ' overdue' : ''}">${cycleLabel(t.cycleDays)} · ${due}</div>`;
     }
     return `<li class="type-row" style="${colorVars(t)}">
-      ${chip(t)}
+      <span class="side-chip" data-drag="type" data-type-id="${t.id}" title="${esc(t.name)}: ${state.settings.locked ? 'unlock, then drag onto a day' : 'drag onto a day or the backlog'}">${chip(t)}</span>
       <div class="type-info">
         <div class="type-name"><span>${esc(t.name)}</span>
           <button class="icon-btn" data-action="edit-type" data-type-id="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">&#9998;</button></div>
@@ -422,6 +433,7 @@ function placeInBacklog(e, beforeId) {
 function addEvent(type, start, beforeId) {
   const e = { id: newId('e'), typeId: type.id, title: type.name, start: null, end: null, time: '', notes: '', status: 'todo', deletedAt: null };
   state.events.push(e);
+  markUsed(type.id);
   if (start) moveTo(e, start);
   else placeInBacklog(e, beforeId);
   commit();
@@ -639,8 +651,9 @@ function openTypeEditor(id) {
       <p class="field-label">…or make your own</p>`}
     <label class="field">Name<input name="name" required maxlength="40" value="${esc(t.name)}"></label>
     ${t.multiDay ? '<p class="hint">Trips use the takeoff and landing icons.</p>' : `<p class="field-label">Icon</p>
-      <div class="icon-grid">${ICON_LIBRARY.map(([k, label]) =>
-        `<label class="icon-opt" title="${label}"><input type="radio" name="icon" value="${k}"${k === t.icon ? ' checked' : ''}><span class="chip">${ICONS[k]}</span></label>`).join('')}</div>`}
+      ${ICON_CATEGORIES.map(([cat, icons]) => `<p class="icon-cat">${cat}</p>
+        <div class="icon-grid">${icons.map(([k, label]) =>
+          `<label class="icon-opt" title="${label}"><input type="radio" name="icon" value="${k}"${k === t.icon ? ' checked' : ''}><span class="chip">${ICONS[k]}</span></label>`).join('')}</div>`).join('')}`}
     <p class="field-label">Colour</p>
     <div class="swatches">${Object.entries(COLORS).map(([k, c]) =>
       `<label class="swatch" title="${k}"><input type="radio" name="color" value="${k}"${k === t.color ? ' checked' : ''}><span style="background:${c.c}"></span></label>`).join('')}</div>
@@ -672,7 +685,7 @@ typeForm.addEventListener('submit', ev => {
   if (!name) return;
   const num = v => { const n = parseInt(v, 10); return n > 0 ? n : null; };
   let t = editingTypeId && typeById(editingTypeId);
-  if (!t) { t = { id: newId('t') }; state.types.push(t); }
+  if (!t) { t = { id: newId('t') }; state.types.push(t); markUsed(t.id); }
   Object.assign(t, { name, color: f.get('color') || 'sky', goalPerMonth: num(f.get('goal')), cycleDays: num(f.get('cycle')) });
   if (!t.multiDay) t.icon = f.get('icon') || t.icon || ICON_LIBRARY[0][0];
   typeDialog.close();

@@ -414,6 +414,29 @@ function dragTo(src, target, from, to) {
     click(document.body);
     ok('durations parse', parseDuration('45') === 2700 && parseDuration('28:30') === 1710 && parseDuration('1:05:30') === 3930 && parseDuration('abc') === null);
 
+    // Shortcut icons: 10 most recently used types, newest first
+    click(q('[data-action="reset"]'));
+    if (state.settings.locked) click(q('#lock-btn'));
+    const sv_paletteIds = () => [...document.querySelectorAll('#palette .type-chip')].map(el => el.dataset.typeId);
+    ok('unused types fill the shortcuts in sidebar order', sv_paletteIds().join() === state.types.map(t => t.id).join());
+    dragTo(q('#palette .type-chip[data-type-id="bedsheets"]'), day('2027-01-28'));
+    ok('dropping a shortcut moves it to the front', sv_paletteIds()[0] === 'bedsheets' && state.settings.recentTypes[0] === 'bedsheets');
+    for (let i = 0; i < 6; i++) state.types.push({ id: 'extra' + i, name: 'Extra ' + i, icon: 'dice', color: 'red', goalPerMonth: null, cycleDays: null });
+    commit();
+    ok('at most 10 shortcuts', sv_paletteIds().length === 10 && sv_paletteIds()[0] === 'bedsheets' && !sv_paletteIds().includes('extra5'));
+    dragTo(q('#types .side-chip[data-type-id="extra5"]'), day('2027-01-29'));
+    ok('a type dragged from the sidebar is added and joins the shortcuts at the front', state.events.some(e => e.typeId === 'extra5' && e.start === '2027-01-29') && sv_paletteIds()[0] === 'extra5' && sv_paletteIds()[1] === 'bedsheets');
+    // Type editor: icons grouped by category, with Trivia and Pub among them
+    click(q('[data-action="add-type"]'));
+    const sv_cats = [...document.querySelectorAll('#type-form .icon-cat')].map(el => el.textContent);
+    ok('icon picker is grouped', sv_cats.length >= 5 && sv_cats.includes('Fun & social') && sv_cats.includes('Fitness'), sv_cats.join('|'));
+    ok('about 50 icons, including trivia and pub', document.querySelectorAll('#type-form .icon-opt').length === ICON_LIBRARY.length && ICON_LIBRARY.length >= 45 && !!q('#type-form input[value="trivia"]') && !!q('#type-form input[value="beer"]'));
+    ok('every icon in the picker draws', [...document.querySelectorAll('#type-form .icon-opt svg')].length === ICON_LIBRARY.length);
+    const sv_save = q('#type-form [type="submit"]').getBoundingClientRect();
+    ok('Save stays visible while the long picker scrolls', sv_save.bottom <= innerHeight && sv_save.top >= 0);
+    click(q('[data-action="close-dialog"]'));
+    click(q('[data-action="reset"]'));
+
     // Run streaks count weeks (Sun–Sat) with a done run; this week (from Sun 17 Jan) can't break it yet
     click(q('[data-action="reset"]'));
     state.types.push({ id: 'run', name: 'Run', icon: 'shoe', color: 'orange', goalPerMonth: 8, cycleDays: null });

@@ -10,15 +10,36 @@ const COLORS = {
   teal:   { c: '#14b8a6', tint: '#ccfbf1' },
 };
 
-// Icons offered in the type editor (planeLanding and the bin icons are not standalone choices).
-const ICON_LIBRARY = [
-  ['camera', 'Movie camera'], ['planeTakeoff', 'Plane'], ['dumbbell', 'Dumbbell'], ['bag', 'Shopping bag'],
-  ['phone', 'Phone'], ['bed', 'Bed'], ['washingMachine', 'Washing machine'], ['scissors', 'Scissors'],
-  ['tooth', 'Tooth'], ['medkit', 'First-aid kit'], ['shoe', 'Running shoe'], ['swim', 'Swim ring'],
-  ['book', 'Book'], ['stones', 'Zen stones'], ['spray', 'Spray bottle'], ['wateringCan', 'Watering can'],
-  ['coins', 'Money'], ['cake', 'Cake'], ['dinner', 'Plate'], ['bike', 'Bike'], ['music', 'Music'], ['paw', 'Paw'],
-  ['laptop', 'Laptop (coding)'],
+// Icons offered in the type editor, grouped to make them easier to find. The groups exist only in
+// the editor; types and events don't store them. (planeLanding and the UI icons aren't choices.)
+const ICON_CATEGORIES = [
+  ['Fun & social', [
+    ['camera', 'Movie camera'], ['beer', 'Pub / drinks'], ['trivia', 'Trivia / quiz'], ['dinner', 'Plate'],
+    ['coffee', 'Coffee'], ['cake', 'Cake'], ['gift', 'Present'], ['phone', 'Phone'], ['gamepad', 'Video games'],
+    ['dice', 'Board games'], ['masks', 'Theatre'], ['mic', 'Karaoke / gig'], ['music', 'Music'],
+  ]],
+  ['Fitness', [
+    ['shoe', 'Running shoe'], ['dumbbell', 'Dumbbell'], ['bike', 'Bike'], ['swim', 'Swim ring'],
+    ['tennis', 'Tennis'], ['football', 'Football'], ['stones', 'Zen stones'],
+  ]],
+  ['Health', [
+    ['apple', 'Apple'], ['water', 'Water bottle'], ['moon', 'Sleep'], ['pill', 'Pills'], ['tooth', 'Tooth'], ['medkit', 'First-aid kit'],
+  ]],
+  ['Housework & pets', [
+    ['washingMachine', 'Washing machine'], ['bed', 'Bed'], ['spray', 'Spray bottle'], ['broom', 'Broom'],
+    ['wheelieBin', 'Bins'], ['pot', 'Cooking pot'], ['wateringCan', 'Watering can'], ['hammer', 'DIY'], ['paw', 'Paw'],
+  ]],
+  ['Errands & appointments', [
+    ['bag', 'Shopping bag'], ['cart', 'Groceries'], ['coins', 'Money'], ['envelope', 'Post'], ['car', 'Car'], ['scissors', 'Scissors'],
+  ]],
+  ['Learning & creative', [
+    ['book', 'Book'], ['laptop', 'Laptop (coding)'], ['pencil', 'Pencil'], ['palette', 'Art'], ['gradCap', 'Study'],
+  ]],
+  ['Travel & outdoors', [
+    ['planeTakeoff', 'Plane'], ['mountain', 'Hike'], ['tent', 'Camping'], ['beach', 'Beach'],
+  ]],
 ];
+const ICON_LIBRARY = ICON_CATEGORIES.flatMap(([, icons]) => icons);
 
 const PRESET_TYPES = [
   { name: 'Wash bedsheets', icon: 'bed',            color: 'teal',   goalPerMonth: null, cycleDays: 14 },
@@ -39,6 +60,18 @@ const PRESET_TYPES = [
   { name: 'Music practice', icon: 'music',          color: 'purple', goalPerMonth: 12,   cycleDays: null },
   { name: 'Walk the dog',   icon: 'paw',            color: 'yellow', goalPerMonth: null, cycleDays: 1 },
   { name: 'Coding',         icon: 'laptop',         color: 'purple', goalPerMonth: 10,   cycleDays: null },
+  { name: 'Trivia night',   icon: 'trivia',         color: 'purple', goalPerMonth: null, cycleDays: null },
+  { name: 'Pub / drinks',   icon: 'beer',           color: 'yellow', goalPerMonth: null, cycleDays: null },
+  { name: 'Coffee catch-up', icon: 'coffee',        color: 'orange', goalPerMonth: null, cycleDays: null },
+  { name: 'Board games',    icon: 'dice',           color: 'red',    goalPerMonth: null, cycleDays: null },
+  { name: 'Gaming',         icon: 'gamepad',        color: 'purple', goalPerMonth: null, cycleDays: null },
+  { name: 'Tennis',         icon: 'tennis',         color: 'green',  goalPerMonth: 4,    cycleDays: null },
+  { name: 'Football',       icon: 'football',       color: 'green',  goalPerMonth: 4,    cycleDays: null },
+  { name: 'Hike',           icon: 'mountain',       color: 'teal',   goalPerMonth: 2,    cycleDays: null },
+  { name: 'Bins out',       icon: 'wheelieBin',     color: 'green',  goalPerMonth: null, cycleDays: 7 },
+  { name: 'Meal prep',      icon: 'pot',            color: 'red',    goalPerMonth: null, cycleDays: 7 },
+  { name: 'Vitamins',       icon: 'pill',           color: 'sky',    goalPerMonth: null, cycleDays: 1 },
+  { name: 'Study',          icon: 'gradCap',        color: 'purple', goalPerMonth: 12,   cycleDays: null },
 ];
 
 
