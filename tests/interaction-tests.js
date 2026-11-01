@@ -274,6 +274,38 @@ function dragTo(src, target, from, to) {
     ok('vertical-ish swipe ignored', q('#month-title').textContent === 'January 2027');
     await sleep(350);
 
+    // Finger swipe: the month follows the finger, the neighbour slides in, and letting go decides
+    const sv_tm = (type, x, y) => {
+      const t = new Touch({ identifier: 2, target: q('#weeks'), clientX: x, clientY: y });
+      q('#weeks').dispatchEvent(new TouchEvent(type, { bubbles: true, touches: type === 'touchend' ? [] : [t], changedTouches: [t] }));
+    };
+    const sv_w = q('#weeks').offsetWidth;
+    sv_tm('touchstart', 700, 500); sv_tm('touchmove', 680, 502); sv_tm('touchmove', 600, 505);
+    const sv_peek = q('.weeks-peek');
+    ok('dragging moves the month with the finger', q('#weeks').style.transform === 'translateX(-100px)');
+    ok('...and the next month peeks in beside it', !!sv_peek && sv_peek.textContent.includes('Gym') && sv_peek.style.transform === 'translateX(calc(100% - 100px))', sv_peek?.style.transform);
+    ok('the peeking month is just a picture', !!sv_peek && !sv_peek.querySelector('[data-date], [data-id], [data-action]') && sv_peek.inert);
+    ok('the month itself has not changed yet', q('#month-title').textContent === 'January 2027');
+    sv_tm('touchmove', 700 - sv_w * 0.4, 505); sv_tm('touchend', 700 - sv_w * 0.4, 505);
+    await sleep(SLIDE_MS + 80);
+    ok('letting go past a quarter of the width turns the page', q('#month-title').textContent === 'February 2027' && !q('.weeks-peek') && q('#weeks').style.transform === '' && !!day('2027-02-13'));
+    sv_tm('touchstart', 300, 500); sv_tm('touchmove', 320, 500); sv_tm('touchmove', 380, 500);
+    ok('dragging the other way brings in the previous month', q('.weeks-peek')?.style.transform.startsWith('translateX(calc(-100%'));
+    sv_tm('touchend', 380, 500);
+    await sleep(SLIDE_MS + 80);
+    ok('a short drag springs back', q('#month-title').textContent === 'February 2027' && !q('.weeks-peek') && q('#weeks').style.transform === '');
+    sv_tm('touchstart', 700, 500); sv_tm('touchmove', 680, 500);
+    await sleep(20);
+    sv_tm('touchmove', 640, 500); sv_tm('touchend', 640, 500);
+    await sleep(SLIDE_MS + 80);
+    ok('a quick flick turns the page even when short', q('#month-title').textContent === 'March 2027');
+    sv_tm('touchstart', 500, 300); sv_tm('touchmove', 505, 330); sv_tm('touchmove', 520, 420);
+    ok('a mostly-vertical move scrolls instead', !q('.weeks-peek') && q('#weeks').style.transform === '');
+    sv_tm('touchend', 520, 420);
+    click(q('[data-action="go-today"]'));
+    settle();
+    await sleep(350);
+
     // Habit panel collapses (only visible on phones, but the state works everywhere) and is remembered
     click(q('#side-toggle'));
     ok('collapse habit panel', state.settings.statsCollapsed && q('#side').classList.contains('collapsed') && q('#side-toggle').getAttribute('aria-expanded') === 'false');

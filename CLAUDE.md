@@ -110,14 +110,15 @@ Decided with the owner. Keep these unless the owner changes them.
 | New event type | The **+ New type** button sits **next to the lock**: on desktop a pill like the lock's, in blue; on phones a floating white circle with a blue border and blue + beside the lock. The + is an SVG, so it centres exactly. A new type starts in a **random palette colour** (presets bring their own). |
 | Adding on a day | **Right-click** (desktop) or **long-press** (touch, 500ms, cancelled by moving) on an **empty part of a day** opens a panel next to it listing **every event type** (recently used first). Picking one adds it to that day (with Undo). Its **+ New event type** button opens the type editor, which says the day; saving creates the type **and adds it on that day**. |
 | Lock | The 🔒 button: in the shelf on desktop, and a **floating round button bottom-left on phones** (mirroring the bin bottom-right). **Locked by default**, and remembered. When locked nothing can be dragged, so scrolling on a phone never moves icons. Tap and long-press still work. |
+| Dark mode | Follows the device setting (`prefers-color-scheme`). Event icons keep their pastel chips; the lock, bin and logo get lighter outlines; season colours and other accents have brighter dark versions. |
 | Month title | The month name is heavy, in a **solid colour for its Sydney season** (`season()`; southern hemisphere): summer Dec–Feb orange, autumn Mar–May amber-brown, winter Jun–Aug deep blue, spring Sep–Nov jacaranda purple. The year is light grey. The "Calendar Boy" title is bold dark green. |
 | Top bar | The header (title, month, Today, Data…) and the shelf under it form `.topbar`, **always on screen**: on desktop nothing else scrolls; on phones it's `position: sticky` while the page scrolls. |
 | Shelf (under the header, full width) | Lock + **Add palette** (shortcut icons to drag onto a day or the backlog: the **10 most recently used types, newest first**. Adding an event of a type, by drop or by tapping a due ghost, or creating a type, moves it to the front. Unused types fill any empty slots in sidebar order. `settings.recentTypes`, per device. Types outside the 10 can be dragged from their **sidebar icon** instead) + **Backlog** (drop zone; drag items into a new **order**). On phones the "Add" label is hidden. **Collapsible** with its Hide / "Add & backlog" button (`settings.shelfCollapsed`, per device, expanded by default); collapsed, it keeps only the lock and + (desktop) and that button. |
 | Desktop layout | The window never scrolls. The month fills the space under the top bar (weeks share the height), and **only the Event types sidebar scrolls**. If the window is too short for the weeks' minimum height (90px), the calendar column scrolls instead. |
 | Trips | Drag the **takeoff** icon to move **only the start**. Drag the **landing** icon to move **only the end** (start ≤ end is enforced). Drag the **dashed middle** to move the **whole trip**. The popup's start/end fields behave the same way. |
 | Months | All months: ‹ › arrows plus a **Today** button (jumps to pretend-today's month). Overflow days from neighbouring months show events and accept drops. |
-| Month by gesture | **Phone**: a horizontal swipe on the calendar (left = next, right = previous). When unlocked, swipes that start on an icon drag it instead. **Desktop**: the mouse wheel over the calendar changes month (once the month's top/bottom edge is on screen, which it always is unless the window is very short). One wheel gesture = one month. |
-| Month slide | Changing month slides the old grid out and the new one in (260ms): **sideways** for swipes, arrows and Today; **up/down** for the wheel. Skipped when the device asks for reduced motion. |
+| Month by gesture | **Phone**: a horizontal swipe on the calendar (left = next, right = previous). The month **follows the finger** with its neighbour sliding in beside it; letting go past a quarter of the width, or with a flick, turns the page, otherwise it springs back. When unlocked, swipes that start on an icon drag it instead. **Desktop**: the mouse wheel over the calendar changes month (once the month's top/bottom edge is on screen, which it always is unless the window is very short). One wheel gesture = one month. |
+| Month slide | Changing month slides the old grid out and the new one in (260ms): **sideways** for arrows and Today; **up/down** for the wheel. Finger swipes do their own slide (see above). Skipped when the device asks for reduced motion. |
 | Drag to the edge | While dragging, holding the icon within 36px of the calendar's left/right edge turns the month after 0.6s, and keeps turning every 0.9s while held. A blue edge strip with an arrow just above the finger shows it's about to turn. Hovering the bin (which overlaps the bottom-right corner on phones) never counts as the edge. |
 | "Today" | The **"Today is" date picker** sets a pretend today (default 18 Jan 2027, so the playground has a past). Data → "Use the real date as today". |
 | Show done filter | Shows **only done** events, past and future alike. To do and abandoned are hidden. The backlog is unaffected. |
@@ -135,6 +136,7 @@ Decided with the owner. Keep these unless the owner changes them.
 ## Conventions
 - **Icon style**: flat fills, thick dark outline (`OUTLINE`), 64×64 viewBox, readable at 26px. New icons go in `ICONS`, plus a group in `ICON_CATEGORIES` if users should be able to pick them.
 - **Colours**:
+  - Page colours are tokens in `:root` (`--bg`, `--text`, `--accent`, … plus `--brand`, `--streak`, the season colours) with a dark set in `@media (prefers-color-scheme: dark)` right after them. Use the tokens, not literal colours, so dark mode keeps working. Text on a pastel `--tint` stays dark in both modes.
   - A type's colour is a `COLORS` key. `colorVars(type)` sets `--c` (ring, path, progress bar) and `--tint` (chip background) inline.
   - Don't name a CSS variable `--bg`, because that's the page background token.
 - **Status classes**: `.todo`, `.done` and `.abandoned` on `.event` / `.trip` (and on `.pop-head`). CSS styles the `.chip` inside.
@@ -172,6 +174,7 @@ Decided with the owner. Keep these unless the owner changes them.
   - Swipes use **touch events**, not pointer events: when locked, the browser takes the touch for scrolling and fires `pointercancel`.
   - `main` has `touch-action: pan-y pinch-zoom`, so horizontal moves reach the page.
   - The wheel handler is non-passive so it can `preventDefault()`. `WHEEL_PAUSE_MS` keeps trackpad momentum from skipping several months.
+- **Finger swipe** (`touchmove` on `main`): the first 10px of movement picks an axis; horizontal drags translate `#weeks` and a `peekMonth()` grid (the neighbour, rendered with `weeksHtml(ym)` and made lifeless like the slide snapshot). On release, `finishSwipe()` animates both and, after a **timer**, swaps in the new month with `goToMonth(ym, 'none')` (no second slide). A `touchend` with no move events falls back to the quick-swipe check, which the older tests rely on. Reduced motion skips the follow.
 - **Month slide** (`goToMonth` → `snapshotWeeks` → `slideMonth`):
   - Before re-rendering, a clone of `#weeks` is taken. It is made lifeless: `inert`, `pointer-events: none`, and the `data-id`/`data-drop`/`data-drag`/`data-action` attributes are stripped, so queries, drops and clicks never hit it.
   - The clone slides out over the new grid inside `.weeks-wrap` (`overflow: hidden`).
@@ -186,8 +189,8 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (166 at the time of writing).
-  - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (175 at the time of writing).
+  - The tests are async (long-press waits); `--virtual-time-budget` (20s) lets them finish. If a run prints only the static checks, the budget ran out: raise it.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.
   - Call `settle()` (finishes running animations) before measuring positions after a month change. Headless Edge doesn't reliably run animation frames, so a mid-slide grid gives off-screen coordinates and flaky tests.
@@ -211,7 +214,6 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Ideas for later (not agreed yet; ask the owner first)
 - More animation (e.g. the plane taking off on load, icons wobbling on hover). The owner deferred this; only the month slide exists.
-- A swipe that follows the finger (drag the month along, then let go) instead of a fixed slide.
 - Week/day views.
 - Icon refinement: the plane angles are subtle at small sizes.
 - More multi-day icon pairs (road trip, hospital stay). Custom types are single-day only for now, and `multiDay` / `endIcon` exist only on the seeded holiday type.

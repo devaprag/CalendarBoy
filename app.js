@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.15';
+const APP_VERSION = '4.16';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 // Items per day before "+N more" on phones. On wide screens the month fills the window and
@@ -262,7 +262,13 @@ function renderPalette() {
 }
 
 function renderWeeks() {
-  const [y, m] = viewMonth().split('-').map(Number);
+  weeksEl.innerHTML = weeksHtml(viewMonth());
+  fitDays(weeksEl);
+}
+
+// The grid for any month (the one on screen, or its neighbour peeking in during a swipe).
+function weeksHtml(ym) {
+  const [y, m] = ym.split('-').map(Number);
   const first = new Date(y, m - 1, 1);
   const gridStart = addDays(first, -first.getDay());
   const weekCount = Math.ceil((first.getDay() + new Date(y, m, 0).getDate()) / 7);
@@ -291,7 +297,7 @@ function renderWeeks() {
       const items = dayItems(k, ghosts);
       const shown = narrowScreen.matches && items.length > MAX_VISIBLE ? items.slice(0, MAX_VISIBLE - 1) : items;
       const hidden = items.length - shown.length;
-      cells += `<div class="day${k.startsWith(viewMonth()) ? '' : ' other'}" data-drop="day" data-date="${k}">
+      cells += `<div class="day${k.startsWith(ym) ? '' : ' other'}" data-drop="day" data-date="${k}">
         <div class="date${k === today() ? ' today' : ''}">${d.getDate()}</div>
         <div class="lane" style="--lanes:${dayLanes[i]}"></div>
         <div class="events">
@@ -302,8 +308,7 @@ function renderWeeks() {
     }
     html += `<div class="week" data-week-start="${ws}">${cells}${segments.join('')}</div>`;
   }
-  weeksEl.innerHTML = html;
-  fitDays();
+  return html;
 }
 
 function moreButton(k, n) {
@@ -313,9 +318,9 @@ function moreButton(k, n) {
 // Wide screens: the weeks share the window's height, so each day shows what fits: labelled rows,
 // else icons side by side, else as many icons as fit plus "+N more".
 const FIT_SLACK_PX = 4; // run badges may poke a few px below the last row
-function fitDays() {
+function fitDays(root) {
   if (narrowScreen.matches) return;
-  for (const box of weeksEl.querySelectorAll('.events')) {
+  for (const box of root.querySelectorAll('.events')) {
     const overflows = () => box.scrollHeight > box.clientHeight + FIT_SLACK_PX;
     if (!overflows()) continue;
     box.classList.add('compact');
@@ -1105,7 +1110,8 @@ dataMenu.addEventListener('toggle', () => {
 // ---------- Changing month: wheel (desktop) and swipe (phone) ----------
 const mainEl = document.querySelector('main');
 
-// axis: 'x' for swipes and arrows (pages turn sideways), 'y' for the mouse wheel.
+// axis: 'x' for arrows and quick swipes (pages turn sideways), 'y' for the mouse wheel,
+// 'none' when a finger swipe has already slid the new month into place.
 function changeMonth(n, axis = 'x') {
   goToMonth(shiftMonth(viewMonth(), n), axis);
 }
@@ -1113,7 +1119,7 @@ function changeMonth(n, axis = 'x') {
 function goToMonth(ym, axis = 'x') {
   if (ym === viewMonth()) return;
   const dir = ym > viewMonth() ? 1 : -1;
-  const snapshot = snapshotWeeks();
+  const snapshot = axis === 'none' ? null : snapshotWeeks();
   state.settings.viewMonth = ym;
   closePopover();
   commit();
@@ -1131,11 +1137,28 @@ function snapshotWeeks() {
   const copy = weeksEl.cloneNode(true);
   copy.removeAttribute('id');
   copy.classList.add('weeks-leaving');
-  copy.inert = true;
   copy.style.height = weeksEl.offsetHeight + 'px';
-  copy.querySelectorAll('[data-id], [data-date], [data-drop], [data-drag], [data-action]').forEach(el =>
-    ['data-id', 'data-date', 'data-drop', 'data-drag', 'data-action'].forEach(a => el.removeAttribute(a)));
-  return copy;
+  return makeLifeless(copy);
+}
+
+// Strips the hooks that queries, drops and clicks look for, so a copy of a grid is just a picture.
+function makeLifeless(el) {
+  el.inert = true;
+  el.querySelectorAll('[data-id], [data-date], [data-drop], [data-drag], [data-action]').forEach(x =>
+    ['data-id', 'data-date', 'data-drop', 'data-drag', 'data-action'].forEach(a => x.removeAttribute(a)));
+  return el;
+}
+
+// The neighbouring month, drawn beside the grid (side 1 = right, -1 = left) for a finger swipe.
+function peekMonth(ym, side) {
+  const el = document.createElement('div');
+  el.className = 'weeks weeks-peek';
+  el.style.height = weeksEl.offsetHeight + 'px';
+  el.style.transform = `translateX(${side * 100}%)`;
+  el.innerHTML = weeksHtml(ym);
+  weeksEl.after(el);
+  fitDays(el);
+  return makeLifeless(el);
 }
 
 function slideMonth(snapshot, dir, axis) {
@@ -1176,25 +1199,88 @@ mainEl.addEventListener('wheel', ev => {
 }, { passive: false });
 
 // Horizontal swipe on the calendar: left = next month, right = previous (like turning pages).
+// The month follows the finger with its neighbour sliding in beside it; letting go past a quarter of
+// the width (or with a flick) turns the page, otherwise it springs back. Mostly-vertical moves scroll.
 // Touch events rather than pointer events, because the browser cancels pointer events once it scrolls.
-const SWIPE_MIN_PX = 60, SWIPE_MAX_MS = 700;
+const SWIPE_MIN_PX = 60, SWIPE_MAX_MS = 700;      // quick swipe without move events (fallback)
+const SWIPE_AXIS_PX = 10, SWIPE_TURN = 0.25, SWIPE_FLICK = 0.5; // px to pick an axis; share of width; px/ms
 let swipe = null;
 mainEl.addEventListener('touchstart', ev => {
   const draggable = !state.settings.locked && ev.target.closest('[data-drag]');
   const t = ev.touches[0];
-  swipe = ev.touches.length === 1 && !draggable ? { x: t.clientX, y: t.clientY, time: Date.now() } : null;
+  swipe = ev.touches.length === 1 && !draggable
+    ? { x: t.clientX, y: t.clientY, time: Date.now(), axis: null, peek: null, side: 0, dx: 0, vx: 0, lastX: t.clientX, lastT: Date.now() }
+    : null;
 }, { passive: true });
+
+mainEl.addEventListener('touchmove', ev => {
+  if (!swipe || ev.touches.length !== 1 || reducedMotion.matches) return;
+  const t = ev.touches[0];
+  const dx = t.clientX - swipe.x, dy = t.clientY - swipe.y;
+  if (!swipe.axis) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_AXIS_PX) return;
+    swipe.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (swipe.axis === 'x') closePopover();
+  }
+  if (swipe.axis !== 'x') return;
+  const side = dx < 0 ? 1 : -1; // swiping left brings in the next month from the right
+  if (side !== swipe.side) {
+    swipe.peek?.remove();
+    swipe.peek = peekMonth(shiftMonth(viewMonth(), side), side);
+    swipe.side = side;
+  }
+  const now = Date.now();
+  if (now > swipe.lastT) swipe.vx = (t.clientX - swipe.lastX) / (now - swipe.lastT);
+  swipe.lastX = t.clientX; swipe.lastT = now; swipe.dx = dx;
+  weeksEl.style.transform = `translateX(${dx}px)`;
+  swipe.peek.style.transform = `translateX(calc(${side * 100}% + ${dx}px))`;
+}, { passive: true });
+
 mainEl.addEventListener('touchend', ev => {
   if (!swipe) return;
-  const t = ev.changedTouches[0];
-  const dx = t.clientX - swipe.x, dy = t.clientY - swipe.y, quick = Date.now() - swipe.time < SWIPE_MAX_MS;
+  const s = swipe;
   swipe = null;
+  const t = ev.changedTouches[0];
+  const dx = t.clientX - s.x, dy = t.clientY - s.y;
+  if (s.axis === 'x' && s.peek) return finishSwipe(s);
+  if (s.axis) return;
+  // No move events seen (or reduced motion): a quick, clearly horizontal swipe still turns the page.
+  const quick = Date.now() - s.time < SWIPE_MAX_MS;
   if (!quick || Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < 2 * Math.abs(dy)) return;
-  // A swipe shouldn't also count as a tap on the icon it started on.
-  suppressClick = true;
-  setTimeout(() => { suppressClick = false; }, 300);
+  swallowSwipeTap();
   changeMonth(dx < 0 ? 1 : -1);
 }, { passive: true });
+
+mainEl.addEventListener('touchcancel', () => {
+  if (swipe?.peek) finishSwipe({ ...swipe, dx: 0, vx: 0 });
+  swipe = null;
+});
+
+// A swipe shouldn't also count as a tap on the icon it started on.
+function swallowSwipeTap() {
+  suppressClick = true;
+  setTimeout(() => { suppressClick = false; }, 300);
+}
+
+function finishSwipe(s) {
+  const w = weeksEl.offsetWidth;
+  const flick = Math.abs(s.vx) > SWIPE_FLICK && Math.sign(s.vx) === -s.side && Math.abs(s.dx) > SWIPE_AXIS_PX * 3;
+  const turn = Math.abs(s.dx) > w * SWIPE_TURN || flick;
+  const target = turn ? -s.side * w : 0;
+  const duration = Math.max(120, SLIDE_MS * Math.abs(target - s.dx) / w);
+  const timing = { duration, easing: 'cubic-bezier(.2, .7, .3, 1)', fill: 'forwards' };
+  weeksEl.animate([{ transform: `translateX(${s.dx}px)` }, { transform: `translateX(${target}px)` }], timing);
+  s.peek.animate([{ transform: `translateX(${s.side * w + s.dx}px)` }, { transform: `translateX(${s.side * w + target}px)` }], timing);
+  if (Math.abs(s.dx) > SWIPE_AXIS_PX) swallowSwipeTap();
+  // A timer rather than onfinish (see slideMonth). The peek already shows the new month where the grid
+  // will be, so swapping them in one go doesn't flicker.
+  setTimeout(() => {
+    weeksEl.getAnimations().forEach(a => a.cancel());
+    weeksEl.style.transform = '';
+    s.peek.remove();
+    if (turn) goToMonth(shiftMonth(viewMonth(), s.side), 'none');
+  }, duration + 20);
+}
 
 // ---------- Press: tap, long-press and drag (Pointer Events, so touch works too) ----------
 // A press that moves more than DRAG_THRESHOLD drags (only when unlocked; when locked the page

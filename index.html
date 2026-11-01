@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Calendar Boy</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1f1f1f" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="stylesheet" href="styles.css?v=4.15">
+<link rel="stylesheet" href="styles.css?v=4.16">
 </head>
 <body class="locked">
 
@@ -92,11 +93,11 @@
 <dialog id="year-dialog" class="year-dialog"></dialog>
 
 <!-- Plain scripts, not modules: modules and fetch() are blocked on file:// -->
-<script src="icons.js?v=4.15"></script>
-<script src="data.js?v=4.15"></script>
-<script src="firebase-config.js?v=4.15"></script>
+<script src="icons.js?v=4.16"></script>
+<script src="data.js?v=4.16"></script>
+<script src="firebase-config.js?v=4.16"></script>
 <script src="../strava-lib/strava-export.js?v=1"></script>
-<script src="app.js?v=4.15"></script>
-<script src="sync.js?v=4.15"></script>
+<script src="app.js?v=4.16"></script>
+<script src="sync.js?v=4.16"></script>
 </body>
 </html>
