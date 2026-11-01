@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.12';
+const APP_VERSION = '4.13';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 // Items per day before "+N more" on phones. On wide screens the month fills the window and
@@ -975,8 +975,31 @@ const ACTIONS = {
 // Set after a long-press or a drop, so the click the browser fires afterwards is ignored.
 let suppressClick = false;
 
+// Dead time after a finger hold opens a popup (details or day picker): the popup ignores taps until
+// the finger has lifted and HOLD_DEAD_MS has passed. Phones send the lift as a tap, sometimes late,
+// which used to land on whatever the popup had put under the finger. Android's own long-press
+// (text selection, "Copy / Select all" bar) is blocked inside the popup for the same window.
+const HOLD_DEAD_MS = 350, HOLD_MAX_MS = 4000;
+let holdOpenedAt = 0, holdLiftedAt = 0, fingerDown = false;
+function holdOpened() { holdOpenedAt = Date.now(); holdLiftedAt = 0; }
+function popupDead() {
+  if (!holdOpenedAt) return false;
+  if (!holdLiftedAt) return Date.now() - holdOpenedAt < HOLD_MAX_MS; // safety net if the lift is never seen
+  return Date.now() - holdLiftedAt < HOLD_DEAD_MS;
+}
+const isFinger = ev => ev.pointerType === 'touch' || ev.pointerType === 'pen';
+window.addEventListener('pointerdown', ev => { if (isFinger(ev)) fingerDown = true; }, true);
+for (const type of ['pointerup', 'pointercancel', 'touchend', 'touchcancel']) {
+  window.addEventListener(type, () => {
+    fingerDown = false;
+    if (holdOpenedAt && !holdLiftedAt) holdLiftedAt = Date.now();
+  }, true);
+}
+document.addEventListener('selectstart', ev => { if (popupDead() && popover.contains(ev.target)) ev.preventDefault(); });
+
 document.addEventListener('click', ev => {
   if (suppressClick) { suppressClick = false; return; }
+  if (popupDead() && popover.contains(ev.target)) { ev.preventDefault(); return; }
   const actionEl = ev.target.closest('[data-action]');
   if (actionEl) {
     if (!popover.contains(actionEl)) closePopover();
@@ -1011,6 +1034,7 @@ weeksEl.addEventListener('pointerdown', ev => {
   dayPress = { x: ev.clientX, y: ev.clientY, timer: setTimeout(() => {
     dayPress = null;
     suppressClick = true;
+    holdOpened();
     openDayPicker(dayEl);
   }, LONG_PRESS_MS) };
 });
@@ -1022,8 +1046,10 @@ window.addEventListener('pointercancel', cancelDayPress);
 
 // Right-click on desktop; on Android a long-press also arrives here.
 document.addEventListener('contextmenu', ev => {
+  if (popover.contains(ev.target) && (popupDead() || fingerDown)) { ev.preventDefault(); return; }
   if (onEmptyDay(ev.target)) {
     ev.preventDefault();
+    if (fingerDown && popover.hidden) holdOpened();
     openDayPicker(ev.target.closest('.day'));
     return;
   }
@@ -1032,6 +1058,7 @@ document.addEventListener('contextmenu', ev => {
   ev.preventDefault();
   if (press) { clearTimeout(press.timer); press = null; suppressClick = true; }
   if (popoverView?.kind === 'event' && popoverView.id === item.dataset.id) return;
+  if (fingerDown) holdOpened();
   openInfo(item);
 });
 
@@ -1177,7 +1204,7 @@ document.addEventListener('pointerdown', ev => {
   if (ev.button !== 0) return;
   const src = ev.target.closest('[data-drag]');
   if (!src) return;
-  press = { src, x: ev.clientX, y: ev.clientY, dragging: false, part: 'whole', offset: 0, timer: null };
+  press = { src, finger: isFinger(ev), x: ev.clientX, y: ev.clientY, dragging: false, part: 'whole', offset: 0, timer: null };
   if (src.matches('.event, .trip')) press.timer = setTimeout(longPress, LONG_PRESS_MS);
   if (src.classList.contains('trip')) {
     press.part = ev.target.closest('.trip-start') ? 'start' : ev.target.closest('.trip-end') ? 'end' : 'whole';
@@ -1262,8 +1289,10 @@ document.addEventListener('pointercancel', () => {
 function longPress() {
   if (!press || press.dragging) return;
   const item = press.src;
+  const finger = press.finger;
   press = null;
   suppressClick = true;
+  if (finger) holdOpened();
   openInfo(item);
 }
 

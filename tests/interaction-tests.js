@@ -496,6 +496,40 @@ function dragTo(src, target, from, to) {
     sv_touch('pointerup', sv_day8, sv_dc.x, sv_dc.y + 40);
     ok('a press that moves (scrolling) does not', popover.hidden);
     await sleep(10);
+    // Dead time after a finger hold: the popup ignores taps until the finger lifts + HOLD_DEAD_MS
+    const sv_n0 = state.events.length;
+    sv_touch('pointerdown', sv_day8, sv_dc.x, sv_dc.y);
+    await sleep(LONG_PRESS_MS + 100);
+    ok('hold opens the picker', sv_pickerOpen());
+    const sv_cm = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    q('#popover .pick-type').dispatchEvent(sv_cm);
+    ok("Android's long-press inside the fresh picker is blocked", sv_cm.defaultPrevented && sv_pickerOpen());
+    const sv_sel = new Event('selectstart', { bubbles: true, cancelable: true });
+    q('#popover .pick-type span:last-child').dispatchEvent(sv_sel);
+    ok('text selection inside the fresh picker is blocked', sv_sel.defaultPrevented);
+    click(q('#popover .pick-type'));
+    ok('a tap while the finger is still down is ignored', state.events.length === sv_n0 && sv_pickerOpen());
+    sv_touch('pointerup', sv_day8, sv_dc.x, sv_dc.y);
+    suppressClick = false; // the lift's own click, consumed separately
+    click(q('#popover .pick-type'));
+    ok('a late tap from the lift is ignored too', state.events.length === sv_n0 && sv_pickerOpen());
+    await sleep(HOLD_DEAD_MS + 100);
+    click(q('#popover .pick-type'));
+    ok('after the dead time a tap picks the type', state.events.length === sv_n0 + 1 && popover.hidden);
+    // Same for an event's details opened by a finger hold
+    const sv_cin = find('2027-01-22', 'Cinema with Alex'), sv_cinEl = elOf(sv_cin), sv_cc = center(sv_cinEl);
+    const sv_status = sv_cin.status;
+    sv_touch('pointerdown', sv_cinEl, sv_cc.x, sv_cc.y);
+    await sleep(LONG_PRESS_MS + 100);
+    sv_touch('pointerup', sv_cinEl, sv_cc.x, sv_cc.y);
+    suppressClick = false;
+    ok('finger hold opens event details', popoverView?.kind === 'event' && popoverView.id === sv_cin.id);
+    click(q('[data-action="set-status"][data-status="abandoned"]'));
+    ok('a tap right after the lift does not change the status', sv_cin.status === sv_status);
+    await sleep(HOLD_DEAD_MS + 100);
+    click(q('[data-action="set-status"][data-status="abandoned"]'));
+    ok('after the dead time the status buttons work', sv_cin.status === 'abandoned');
+    click(document.body);
     ok('Tracker button with an icon', q('[data-action="open-year"]').textContent.trim() === 'Tracker' && !!q('[data-action="open-year"] svg'));
     ok('month title styled in two parts', q('#month-title .month-name').textContent === 'January' && q('#month-title .month-year').textContent === '2027');
     ok('month colour follows Sydney seasons', q('#month-title .month-name').classList.contains('summer')

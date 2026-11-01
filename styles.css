@@ -342,7 +342,9 @@ body:not(.locked) [data-drag] { touch-action: none; cursor: grab; }
 .pop-status { margin: 4px 0 14px; }
 .pop-actions { display: flex; gap: 8px; margin-top: 6px; }
 .pop-heading { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
-/* Type picker for a day (right-click / long-press on an empty part of it). */
+/* Type picker for a day (right-click / long-press on an empty part of it). Not selectable, so a
+   finger still held after opening it doesn't start Android's text selection. */
+.pick-list, .pop-heading { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .pick-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: 50vh; overflow-y: auto; margin-bottom: 10px; }
 .pick-type {
   display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px;

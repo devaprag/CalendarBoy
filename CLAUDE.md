@@ -148,6 +148,7 @@ Decided with the owner. Keep these unless the owner changes them.
 - **Trip lanes** are reserved per day (`.lane` gets `--lanes` = the lanes crossing that day), so days a trip doesn't touch keep their room for icons.
 - **Long-press on an empty day** has its own small handler (`dayPress`), separate from `press`. Android may also fire `contextmenu` for the same press; both call `openDayPicker()`, which does nothing if that day's picker (popover kind `pick`) is already open.
 - **Type editor opened from a day's picker** remembers it in `addToDay`; the submit handler adds the new type's event there. The plain + button leaves it null.
+- **Dead time after a finger hold**: when a touch/pen hold opens a popup (event details or the day picker), the popup ignores taps until the finger has lifted and `HOLD_DEAD_MS` (350ms) has passed (`holdOpened()` / `popupDead()`). Phones send the lift as a tap, sometimes after `suppressClick` has been cleared, and it used to land on whatever the popup put under the finger (picking a type, changing a status). In that window, `contextmenu` and `selectstart` inside the popup are blocked too, so Android doesn't start text selection or its Copy / Select all bar. Mouse long-presses don't get the dead time.
 - **Press handling** (`pointerdown` → `press`):
   - Moving more than 6px starts a drag, or does nothing when locked, so the browser scrolls.
   - Holding for 500ms opens the details.
@@ -176,7 +177,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (155 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (164 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.
