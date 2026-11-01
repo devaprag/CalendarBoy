@@ -17,26 +17,41 @@ const ICON_CATEGORIES = [
     ['camera', 'Movie camera'], ['beer', 'Pub / drinks'], ['trivia', 'Trivia / quiz'], ['dinner', 'Plate'],
     ['coffee', 'Coffee'], ['cake', 'Cake'], ['gift', 'Present'], ['phone', 'Phone'], ['gamepad', 'Video games'],
     ['dice', 'Board games'], ['masks', 'Theatre'], ['mic', 'Karaoke / gig'], ['music', 'Music'],
+    ['pizza', 'Pizza / takeaway'], ['popcorn', 'Popcorn'], ['wine', 'Wine'], ['balloon', 'Party'], ['guitar', 'Guitar'],
+    ['heart', 'Date night'], ['ticket', 'Tickets / show'], ['cards', 'Card games'],
   ]],
   ['Fitness', [
     ['shoe', 'Running shoe'], ['dumbbell', 'Dumbbell'], ['bike', 'Bike'], ['swim', 'Swim ring'],
     ['tennis', 'Tennis'], ['football', 'Football'], ['stones', 'Zen stones'],
+    ['basketball', 'Basketball'], ['golf', 'Golf'], ['boxing', 'Boxing'], ['kettlebell', 'Kettlebell'],
+    ['yoga', 'Yoga'], ['stopwatch', 'Workout timer'], ['surf', 'Surfing'],
   ]],
   ['Health', [
     ['apple', 'Apple'], ['water', 'Water bottle'], ['moon', 'Sleep'], ['pill', 'Pills'], ['tooth', 'Tooth'], ['medkit', 'First-aid kit'],
+    ['toothbrush', 'Toothbrush'], ['bath', 'Bath / self-care'], ['scale', 'Weigh-in'], ['glasses', 'Optician'],
+    ['syringe', 'Vaccination'], ['thermometer', 'Temperature'],
   ]],
   ['Housework & pets', [
     ['washingMachine', 'Washing machine'], ['bed', 'Bed'], ['spray', 'Spray bottle'], ['broom', 'Broom'],
     ['wheelieBin', 'Bins'], ['pot', 'Cooking pot'], ['wateringCan', 'Watering can'], ['hammer', 'DIY'], ['paw', 'Paw'],
+    ['dishes', 'Dishes'], ['iron', 'Ironing'], ['lightbulb', 'Light bulb / fix it'], ['plant', 'House plant'],
+    ['cat', 'Cat'], ['bone', 'Dog'], ['fish', 'Fish'],
   ]],
   ['Errands & appointments', [
     ['bag', 'Shopping bag'], ['cart', 'Groceries'], ['coins', 'Money'], ['envelope', 'Post'], ['car', 'Car'], ['scissors', 'Scissors'],
+    ['bank', 'Bank'], ['fuel', 'Fuel'], ['parcel', 'Parcel'], ['key', 'Keys'], ['clipboard', 'To-do list'], ['shirt', 'Clothes / dry cleaning'],
   ]],
   ['Learning & creative', [
     ['book', 'Book'], ['laptop', 'Laptop (coding)'], ['pencil', 'Pencil'], ['palette', 'Art'], ['gradCap', 'Study'],
+    ['photo', 'Photography'], ['brush', 'Painting'], ['yarn', 'Knitting'], ['globe', 'Languages / world'],
+    ['puzzle', 'Puzzle'], ['chess', 'Chess'],
   ]],
   ['Travel & outdoors', [
     ['planeTakeoff', 'Plane'], ['mountain', 'Hike'], ['tent', 'Camping'], ['beach', 'Beach'],
+    ['suitcase', 'Packing'], ['train', 'Train'], ['boat', 'Sailing'], ['fishing', 'Fishing'], ['campfire', 'Campfire'], ['map', 'Map / day trip'],
+  ]],
+  ['Family & occasions', [
+    ['house', 'Visit home'], ['baby', 'Baby'], ['rings', 'Wedding / anniversary'], ['tree', 'Christmas'],
   ]],
 ];
 const ICON_LIBRARY = ICON_CATEGORIES.flatMap(([, icons]) => icons);

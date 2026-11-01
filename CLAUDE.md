@@ -35,7 +35,7 @@ The owner is building it for fun and tests it on a Samsung phone as well as a PC
   - `bin`, `binFull`, `lock`, `unlock` and `tracker` are UI-only icons.
 - **`data.js`**
   - `COLORS` is the 8-colour palette, `{ c, tint }`.
-  - `ICON_CATEGORIES` lists the ~50 icons the type editor offers, in groups (Fun & social, Fitness, Health, …). The groups only exist in the editor; types and events don't store them. `ICON_LIBRARY` is the same list, flattened.
+  - `ICON_CATEGORIES` lists the 100 icons the type editor offers, in 8 groups (Fun & social, Fitness, Health, Housework & pets, Errands, Learning & creative, Travel & outdoors, Family & occasions). The groups only exist in the editor; types and events don't store them. `ICON_LIBRARY` is the same list, flattened.
   - `PRESET_TYPES` holds the predefined types.
   - `SEED` is **generated** by an IIFE:
     - Gym Mon/Wed/Fri, groceries Saturday, Gran call Sunday, and bedsheets every 2 weeks, from Nov 2026 to Mar 2027. Routines are skipped while away on a trip.

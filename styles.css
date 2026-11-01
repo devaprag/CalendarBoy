@@ -429,7 +429,7 @@ dialog {
   padding: 20px; border: 0; border-radius: 14px;
   box-shadow: 0 12px 40px rgba(0,0,0,.3);
 }
-/* The type editor is long (presets + ~50 icons): it scrolls, with Save / Cancel always in view. */
+/* The type editor is long (presets + 100 icons): it scrolls, with Save / Cancel always in view. */
 #type-form .dialog-actions { position: sticky; bottom: -20px; margin: 18px -20px -20px; padding: 12px 20px 20px; background: var(--bg); border-top: 1px solid var(--hover); }
 .icon-cat { margin: 10px 0 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 dialog::backdrop { background: rgba(0,0,0,.35); }

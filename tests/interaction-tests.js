@@ -448,7 +448,7 @@ function dragTo(src, target, from, to) {
     click(q('[data-action="add-type"]'));
     const sv_cats = [...document.querySelectorAll('#type-form .icon-cat')].map(el => el.textContent);
     ok('icon picker is grouped', sv_cats.length >= 5 && sv_cats.includes('Fun & social') && sv_cats.includes('Fitness'), sv_cats.join('|'));
-    ok('about 50 icons, including trivia and pub', document.querySelectorAll('#type-form .icon-opt').length === ICON_LIBRARY.length && ICON_LIBRARY.length >= 45 && !!q('#type-form input[value="trivia"]') && !!q('#type-form input[value="beer"]'));
+    ok('100 icons, including trivia and pub', document.querySelectorAll('#type-form .icon-opt').length === ICON_LIBRARY.length && ICON_LIBRARY.length === 100 && !!q('#type-form input[value="trivia"]') && !!q('#type-form input[value="beer"]'));
     ok('every icon in the picker draws', [...document.querySelectorAll('#type-form .icon-opt svg')].length === ICON_LIBRARY.length);
     const sv_save = q('#type-form [type="submit"]').getBoundingClientRect();
     ok('Save stays visible while the long picker scrolls', sv_save.bottom <= innerHeight && sv_save.top >= 0);

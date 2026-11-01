@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.17';
+const APP_VERSION = '4.18';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 // Items per day before "+N more" on phones. On wide screens the month fills the window and
