@@ -437,6 +437,21 @@ function dragTo(src, target, from, to) {
     click(q('[data-action="close-dialog"]'));
     click(q('[data-action="reset"]'));
 
+    // The bin keeps the 5 most recently removed items
+    click(q('[data-action="reset"]'));
+    const sv_victims = state.events.filter(e => e.start && !e.end).slice(0, 6);
+    sv_victims.slice(0, 4).forEach((e, i) => { e.deletedAt = `2020-01-0${i + 1}T00:00:00.000Z`; });
+    commit();
+    const sv_binCount = () => state.events.filter(e => e.deletedAt).length;
+    ok('bin starts with 4', sv_binCount() === 4);
+    undoable(() => { removeEvent(sv_victims[4].id); return 'Moved to the bin'; });
+    ok('5th item fits', sv_binCount() === 5 && !!byId(sv_victims[0].id) && q('#bin-badge').textContent === '5');
+    undoable(() => { removeEvent(sv_victims[5].id); return 'Moved to the bin'; });
+    ok('6th item deletes the oldest for good', sv_binCount() === 5 && !byId(sv_victims[0].id) && !!byId(sv_victims[5].id)?.deletedAt && q('#bin-badge').textContent === '5');
+    click(q('[data-action="undo"]'));
+    ok('undo brings back the purged item too', !!byId(sv_victims[0].id)?.deletedAt && !byId(sv_victims[5].id).deletedAt && sv_binCount() === 5);
+    click(q('[data-action="reset"]'));
+
     // Run streaks count weeks (Sun–Sat) with a done run; this week (from Sun 17 Jan) can't break it yet
     click(q('[data-action="reset"]'));
     state.types.push({ id: 'run', name: 'Run', icon: 'shoe', color: 'orange', goalPerMonth: 8, cycleDays: null });

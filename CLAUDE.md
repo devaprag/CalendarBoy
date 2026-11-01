@@ -117,8 +117,8 @@ Decided with the owner. Keep these unless the owner changes them.
 | Deleting a type | Deletes all its events, after a confirm showing the count. Undo brings them back. |
 | Items per day | Phones: 3, else 2 + "+N more". Desktop: **whatever fits the cell** (`fitDays()` after each render and on resize): labelled rows if they fit, else **icons only, side by side**, else as many icons as fit + "+N more". |
 | Run stats | An event with a `distance` shows **distance (km, 1 decimal) and pace (min:ss per km)** on its icon: the distance in a **round badge top right** (type colour, like an unread count) and the pace in a small white tag **bottom right**. It also shows `5.2 km · 5:46 /km` under its title. The popup has Distance (km) and Duration (h:mm:ss) fields for Run-icon (`shoe`) types, plus "View on Strava" for imported runs. Duplicate drops the stats. |
-| Strava import | Data → **Import Strava runs (activities.csv)**, from Strava's free data export (the API needs a paid subscription). Each run becomes a **done** event of the Run type on its **local** day (the CSV is UTC), titled with the activity name and timed with its start. The Run type is the first single-day type with the `shoe` icon, created from the preset if missing. A run already imported only gets its numbers refreshed; one removed to the bin stays removed. A planned Run on that day with no stats is **completed** instead of duplicated. Goes through `undoable()`. |
-| Other | The recycling bin (bottom right) restores items or empties. Data menu: sync status + Sign in/out, Use the real date, **Start fresh** (empty calendar, keeps types, real date), Export / Import JSON, Reset demo data. |
+| Strava import | Data → **Import Strava runs (activities.csv)**, from Strava's free data export (the API needs a paid subscription). Each run becomes a **done** event of the Run type on its **local** day (the CSV is UTC), titled with the activity name and timed with its start. The Run type is the first single-day type with the `shoe` icon, created from the preset if missing. A run already imported only gets its numbers refreshed; one removed to the bin stays removed (but once it has left the bin, by emptying or by the 5-item limit, a re-import adds it again). A planned Run on that day with no stats is **completed** instead of duplicated. Goes through `undoable()`. |
+| Other | The recycling bin (bottom right) restores items or empties. It keeps the **5 most recently removed** items: binning a 6th deletes the oldest for good (Undo brings it back). Data menu: sync status + Sign in/out, Use the real date, **Start fresh** (empty calendar, keeps types, real date), Export / Import JSON, Reset demo data. |
 
 ## Conventions
 - **Icon style**: flat fills, thick dark outline (`OUTLINE`), 64×64 viewBox, readable at 26px. New icons go in `ICONS`, plus a group in `ICON_CATEGORIES` if users should be able to pick them.
@@ -170,7 +170,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (131 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (135 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.

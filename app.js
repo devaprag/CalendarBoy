@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.7';
+const APP_VERSION = '4.8';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 // Items per day before "+N more" on phones. On wide screens the month fills the window and
@@ -454,9 +454,19 @@ function duplicateEvent(id) {
 }
 
 function removeEvent(id) {
-  byId(id).deletedAt = new Date().toISOString();
+  moveToBin(byId(id));
   closePopover();
   commit();
+}
+
+// The bin keeps the BIN_SIZE most recently removed events; older ones are deleted for good
+// (inside the caller's undoable(), so Undo brings them back too).
+const BIN_SIZE = 5;
+function moveToBin(e) {
+  e.deletedAt = new Date().toISOString();
+  const older = state.events.filter(x => x.deletedAt && x !== e).sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+  const purge = new Set(older.slice(BIN_SIZE - 1));
+  if (purge.size) state.events = state.events.filter(x => !purge.has(x));
 }
 
 // ---------- Undo ----------
@@ -1243,7 +1253,7 @@ function drop(p, target, x, y) {
   }
   const e = byId(p.src.dataset.id);
   if (!e) return;
-  if (kind === 'bin') e.deletedAt = new Date().toISOString();
+  if (kind === 'bin') moveToBin(e);
   else if (kind === 'backlog') placeInBacklog(e, beforeId);
   else if (kind === 'day') {
     const k = target.dataset.date;
