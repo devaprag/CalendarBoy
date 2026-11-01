@@ -155,12 +155,14 @@ main {
 }
 .lock-btn svg { width: 30px; height: 30px; display: block; }
 .lock-btn[aria-pressed="false"] { border-color: #34a853; color: var(--ok); font-weight: 600; }
+/* Same pill as the lock, in blue. */
 .add-type-btn {
-  flex-shrink: 0; width: 40px; height: 40px; padding: 0;
-  border: 0; border-radius: 50%; background: var(--accent); color: #fff;
-  font-size: 28px; font-weight: 300; line-height: 40px; cursor: pointer; box-shadow: 0 2px 6px rgba(26,115,232,.35);
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 4px 14px 4px 6px; border: 1px solid var(--accent); border-radius: 22px;
+  background: var(--bg); color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer;
 }
-.add-type-btn:hover { background: #1557b0; }
+.add-type-btn svg { width: 30px; height: 30px; display: block; }
+.add-type-btn:hover { background: var(--accent-soft); }
 .shelf-group { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .shelf-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .palette { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -440,8 +442,11 @@ dialog h2 { margin: 0 0 12px; font-size: 18px; font-weight: 500; }
   /* Floating next to the lock. */
   .add-type-btn {
     position: fixed; left: 80px; bottom: 12px; z-index: 5;
-    width: 56px; height: 56px; font-size: 36px; line-height: 56px; box-shadow: 0 4px 14px rgba(0,0,0,.18);
+    width: 56px; height: 56px; padding: 0; justify-content: center;
+    border: 3px solid var(--accent); border-radius: 50%; box-shadow: 0 4px 14px rgba(0,0,0,.18);
   }
+  .add-type-btn svg { width: 34px; height: 34px; }
+  .add-type-btn span { display: none; }
   .lock-btn[aria-pressed="false"] { box-shadow: 0 0 0 3px #34a853, 0 4px 14px rgba(0,0,0,.18); }
   .palette .chip { width: 32px; height: 32px; }
   .backlog-group { min-width: 0; flex-basis: 100%; }

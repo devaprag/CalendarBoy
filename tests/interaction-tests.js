@@ -440,7 +440,7 @@ function dragTo(src, target, from, to) {
     // New event type: + next to the lock, random starting colour, right-click / long-press on an empty day
     click(q('[data-action="reset"]'));
     const sv_lockNext = q('#lock-btn').nextElementSibling;
-    ok('+ button sits next to the lock', sv_lockNext?.id === 'add-type-btn' && sv_lockNext.textContent.trim() === '+');
+    ok('+ button sits next to the lock', sv_lockNext?.id === 'add-type-btn' && !!sv_lockNext.querySelector('svg path') && sv_lockNext.textContent.trim() === 'New type');
     ok('no + Add button in the Event types panel', !q('#side [data-action="add-type"]'));
     const sv_realRandom = Math.random;
     const sv_colourWith = r => { Math.random = () => r; click(q('#add-type-btn')); const c = q('#type-form input[name="color"]:checked')?.value; click(q('[data-action="close-dialog"]')); return c; };
