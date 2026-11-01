@@ -30,7 +30,7 @@ header {
   padding: 10px 16px;
   border-bottom: 1px solid var(--line);
 }
-.brand { display: flex; align-items: center; gap: 8px; font-size: 20px; color: var(--muted); margin-right: 12px; }
+.brand { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; color: #14532d; margin-right: 12px; }
 .brand svg { width: 36px; height: 36px; display: block; }
 .nav-btn {
   width: 32px; height: 32px; border-radius: 50%;
@@ -39,11 +39,12 @@ header {
 }
 .nav-btn:hover { background: var(--hover); }
 header h1 { margin: 0 0 0 4px; font-size: 26px; line-height: 1.1; white-space: nowrap; letter-spacing: -.02em; }
-/* The month pops: heavy, in a blue-purple-pink gradient like the icons; the year sits back. */
-.month-name {
-  font-family: "Segoe UI Variable Display", "Segoe UI Black", "Arial Black", Roboto, system-ui, sans-serif; font-weight: 900;
-  background: linear-gradient(100deg, #1a73e8, #8b5cf6 55%, #ec4899); -webkit-background-clip: text; background-clip: text; color: transparent;
-}
+/* The month pops: heavy, in a solid colour for Sydney's season; the year sits back. */
+.month-name { font-family: "Segoe UI Variable Display", "Segoe UI Black", "Arial Black", Roboto, system-ui, sans-serif; font-weight: 900; }
+.month-name.summer { color: #ea580c; } /* Dec–Feb: sunny orange */
+.month-name.autumn { color: #b45309; } /* Mar–May: amber-brown leaves */
+.month-name.winter { color: #1d4ed8; } /* Jun–Aug: cool deep blue */
+.month-name.spring { color: #7e22ce; } /* Sep–Nov: jacaranda purple */
 .month-year { font-weight: 300; color: var(--muted); }
 .spacer { flex: 1; }
 .today-pick {
@@ -341,6 +342,14 @@ body:not(.locked) [data-drag] { touch-action: none; cursor: grab; }
 .pop-status { margin: 4px 0 14px; }
 .pop-actions { display: flex; gap: 8px; margin-top: 6px; }
 .pop-heading { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+/* Type picker for a day (right-click / long-press on an empty part of it). */
+.pick-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: 50vh; overflow-y: auto; margin-bottom: 10px; }
+.pick-type {
+  display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px;
+  border: 0; border-radius: 8px; background: transparent; text-align: left; font-size: 13px; cursor: pointer;
+}
+.pick-type:hover { background: var(--hover); }
+.pick-type span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Undo toast ---------- */
 .toast {

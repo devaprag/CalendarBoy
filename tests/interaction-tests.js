@@ -447,31 +447,61 @@ function dragTo(src, target, from, to) {
     const sv_keys = Object.keys(COLORS);
     ok('new type colour is random', sv_colourWith(0) === sv_keys[0] && sv_colourWith(0.999) === sv_keys[sv_keys.length - 1]);
     Math.random = sv_realRandom;
+    // Right-click / long-press on an empty day: pick a type to add there, or make a new one
     const sv_emptyDay = day('2027-01-07'); // a Thursday with nothing on it
+    const sv_pickerOpen = () => !popover.hidden && popoverView?.kind === 'pick';
     sv_emptyDay.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    ok('right-click on an empty day opens New event type', typeDialog.open && q('#type-form h2').textContent === 'New event type');
-    click(q('[data-action="close-dialog"]'));
+    ok('right-click on an empty day opens the type picker', sv_pickerOpen() && popoverView.day === '2027-01-07' && /Thu 7 Jan/.test(q('#popover .pop-heading').textContent));
+    ok('picker lists every type, recent first', document.querySelectorAll('#popover .pick-type').length === state.types.length && !!q('#popover [data-action="pick-new-type"]'));
+    const sv_before = state.events.length;
+    click(q('#popover .pick-type[data-type-id="movie"]'));
+    const sv_added = state.events[state.events.length - 1];
+    ok('picking a type adds it to that day', state.events.length === sv_before + 1 && sv_added.typeId === 'movie' && sv_added.start === '2027-01-07' && popover.hidden && !!elOf(sv_added));
+    ok('...with undo', !toastEl.hidden && q('#toast-text').textContent === 'Added');
+    click(q('[data-action="undo"]'));
+    ok('undo removes it', state.events.length === sv_before);
+    // + New event type from the picker: saving adds the new type on that day
+    day('2027-01-07').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    click(q('#popover [data-action="pick-new-type"]'));
+    ok('+ New event type opens the editor for that day', typeDialog.open && popover.hidden && /added on Thu 7 Jan/.test(q('#type-form').textContent));
+    q('#type-form input[name="name"]').value = 'Trivia night';
+    q('#type-form input[name="icon"][value="trivia"]').checked = true;
+    q('#type-form').requestSubmit();
+    const sv_trivia = state.types.find(t => t.name === 'Trivia night');
+    ok('saving creates the type and adds it on that day', !!sv_trivia && state.events.some(e => e.typeId === sv_trivia.id && e.start === '2027-01-07' && !e.deletedAt) && !typeDialog.open);
+    click(q('#add-type-btn'));
+    q('#type-form input[name="name"]').value = 'Plain new type';
+    q('#type-form').requestSubmit();
+    const sv_plain = state.types.find(t => t.name === 'Plain new type');
+    ok('the + button still just creates a type', !!sv_plain && !state.events.some(e => e.typeId === sv_plain.id));
     const sv_ev = elOf(find('2027-01-22', 'Cinema with Alex'));
     sv_ev.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    ok('right-click on an event still opens its details', !typeDialog.open && !popover.hidden);
+    ok('right-click on an event still opens its details', popoverView?.kind === 'event' && !popover.hidden);
     click(document.body);
     const sv_touch = (type, el, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId: 2, pointerType: 'touch', isPrimary: true }));
-    const sv_dc = center(sv_emptyDay);
-    sv_touch('pointerdown', sv_emptyDay, sv_dc.x, sv_dc.y);
+    const sv_day8 = day('2027-01-12'); // an empty day (Tue 12 Jan)
+    const sv_dc = center(sv_day8);
+    sv_touch('pointerdown', sv_day8, sv_dc.x, sv_dc.y);
     await sleep(LONG_PRESS_MS + 100);
-    sv_touch('pointerup', sv_emptyDay, sv_dc.x, sv_dc.y);
-    ok('long-press on an empty day opens New event type', typeDialog.open);
+    sv_touch('pointerup', sv_day8, sv_dc.x, sv_dc.y);
+    ok('long-press on an empty day opens the type picker', sv_pickerOpen() && popoverView.day === '2027-01-12');
+    sv_day8.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    ok('...and Android\'s extra contextmenu for the same press keeps it open', sv_pickerOpen() && popoverView.day === '2027-01-12');
     await sleep(10); // the click after a long-press is swallowed until the finger lifts
-    click(q('[data-action="close-dialog"]'));
-    await sleep(10);
-    sv_touch('pointerdown', sv_emptyDay, sv_dc.x, sv_dc.y);
-    sv_touch('pointermove', sv_emptyDay, sv_dc.x, sv_dc.y + 40);
+    click(document.body);
+    ok('tapping elsewhere closes the picker', popover.hidden);
+    sv_touch('pointerdown', sv_day8, sv_dc.x, sv_dc.y);
+    sv_touch('pointermove', sv_day8, sv_dc.x, sv_dc.y + 40);
     await sleep(LONG_PRESS_MS + 100);
-    sv_touch('pointerup', sv_emptyDay, sv_dc.x, sv_dc.y + 40);
-    ok('a press that moves (scrolling) does not', !typeDialog.open);
+    sv_touch('pointerup', sv_day8, sv_dc.x, sv_dc.y + 40);
+    ok('a press that moves (scrolling) does not', popover.hidden);
     await sleep(10);
     ok('Tracker button with an icon', q('[data-action="open-year"]').textContent.trim() === 'Tracker' && !!q('[data-action="open-year"] svg'));
     ok('month title styled in two parts', q('#month-title .month-name').textContent === 'January' && q('#month-title .month-year').textContent === '2027');
+    ok('month colour follows Sydney seasons', q('#month-title .month-name').classList.contains('summer')
+      && ['2027-03', '2027-06', '2027-09', '2027-12', '2027-02'].map(season).join() === 'autumn,winter,spring,summer,summer');
+    const sv_brand = getComputedStyle(q('.brand'));
+    ok('Calendar Boy title is bold dark green', parseInt(sv_brand.fontWeight, 10) >= 700 && sv_brand.color === 'rgb(20, 83, 45)');
 
     // The bin keeps the 5 most recently removed items
     click(q('[data-action="reset"]'));

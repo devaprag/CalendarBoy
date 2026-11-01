@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.10';
+const APP_VERSION = '4.12';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 // Items per day before "+N more" on phones. On wide screens the month fills the window and
@@ -55,6 +55,10 @@ function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); retu
 function shiftKey(k, n) { return key(addDays(parseDate(k), n)); }
 function dayDiff(a, b) { return Math.round((parseDate(b) - parseDate(a)) / 86400000); }
 function shiftMonth(ym, n) { const [y, m] = ym.split('-').map(Number); return key(new Date(y, m - 1 + n, 1)).slice(0, 7); }
+// Sydney's seasons (southern hemisphere): summer is Dec–Feb.
+function season(ym) {
+  return ['summer', 'autumn', 'winter', 'spring'][Math.floor((Number(ym.slice(5, 7)) % 12) / 3)];
+}
 function monthTitle(ym) { return parseDate(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }); }
 function fmtDate(k) { return parseDate(k).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); }
 function fmtShort(k) { return parseDate(k).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
@@ -215,9 +219,9 @@ function render() {
   const locked = state.settings.locked;
   document.body.classList.toggle('locked', locked);
   todayInput.value = today();
-  // Month and year styled separately (see .month-name / .month-year).
+  // Month and year styled separately (see .month-name / .month-year); the month wears its season's colour.
   const [monthName, year] = monthTitle(viewMonth()).split(' ');
-  $('month-title').innerHTML = `<span class="month-name">${esc(monthName)}</span> <span class="month-year">${esc(year)}</span>`;
+  $('month-title').innerHTML = `<span class="month-name ${season(viewMonth())}">${esc(monthName)}</span> <span class="month-year">${esc(year)}</span>`;
   $('filter-btn').setAttribute('aria-pressed', state.settings.showDoneOnly);
   const lockBtn = $('lock-btn');
   lockBtn.setAttribute('aria-pressed', locked);
@@ -242,10 +246,11 @@ function render() {
 // Shortcut icons: the most recently used types first (settings.recentTypes, per device), topped up
 // with the rest in sidebar order. Every type can also be dragged from the sidebar.
 const PALETTE_SIZE = 10;
-function paletteTypes() {
+function typesByRecent() {
   const recent = (state.settings.recentTypes || []).map(typeById).filter(Boolean);
-  return [...recent, ...state.types.filter(t => !recent.includes(t))].slice(0, PALETTE_SIZE);
+  return [...recent, ...state.types.filter(t => !recent.includes(t))];
 }
+const paletteTypes = () => typesByRecent().slice(0, PALETTE_SIZE);
 function markUsed(typeId) {
   state.settings.recentTypes = [typeId, ...(state.settings.recentTypes || []).filter(id => id !== typeId)].slice(0, 50);
 }
@@ -529,10 +534,11 @@ function hideUndo() {
 const statusLabel = id => `Marked ${STATUS_LABEL[byId(id).status].toLowerCase()}`;
 
 // ---------- Popover ----------
-let popoverView = null; // { kind: 'event', id } | { kind: 'day', day } | { kind: 'bin' }
+let popoverView = null; // { kind: 'event', id } | { kind: 'day', day } | { kind: 'pick', day } | { kind: 'bin' }
 
 function popoverHtml(v) {
   if (v.kind === 'day') return dayList(v.day);
+  if (v.kind === 'pick') return typePicker(v.day);
   if (v.kind === 'bin') return binList();
   return eventDetail(byId(v.id));
 }
@@ -605,6 +611,14 @@ function dayList(k) {
     <p class="hint">Tap to change status · long-press for details</p>`;
 }
 
+// Right-click / long-press on an empty part of a day: pick a type to add there, or make a new one.
+function typePicker(k) {
+  return `<p class="pop-heading">Add to ${fmtDate(k)}</p>
+    <div class="pick-list">${typesByRecent().map(t =>
+      `<button class="pick-type" data-action="pick-type" data-type-id="${t.id}">${chip(t)}<span>${esc(t.name)}</span></button>`).join('')}</div>
+    <div class="pop-actions"><button class="btn" data-action="pick-new-type">+ New event type</button></div>`;
+}
+
 function binList() {
   const items = state.events.filter(e => e.deletedAt && typeOf(e)).sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
   if (!items.length) return '<p class="pop-heading">Recycling bin</p><p class="empty">The bin is empty.</p>';
@@ -653,12 +667,15 @@ function editField(e, field, value) {
 
 // ---------- Type editor ----------
 let editingTypeId = null;
+let addToDay = null; // set when the editor was opened from a day's picker: the new type is added there
 
-function openTypeEditor(id) {
+function openTypeEditor(id, forDay = null) {
   editingTypeId = id;
+  addToDay = id ? null : forDay;
   const t = id ? typeById(id) : { name: '', icon: ICON_LIBRARY[0][0], color: randomColor(), goalPerMonth: null, cycleDays: null };
   typeForm.innerHTML = `
     <h2>${id ? 'Edit event type' : 'New event type'}</h2>
+    ${addToDay ? `<p class="hint">When you save, it's added on ${fmtDate(addToDay)}.</p>` : ''}
     ${id ? '' : `<p class="field-label">Start from a preset</p>
       <div class="presets">${PRESET_TYPES.map((p, i) =>
         `<button type="button" class="preset" data-action="preset" data-preset="${i}">${chip(p)}<span>${esc(p.name)}</span></button>`).join('')}</div>
@@ -705,11 +722,13 @@ typeForm.addEventListener('submit', ev => {
   if (!name) return;
   const num = v => { const n = parseInt(v, 10); return n > 0 ? n : null; };
   let t = editingTypeId && typeById(editingTypeId);
+  const day = addToDay;
   if (!t) { t = { id: newId('t') }; state.types.push(t); markUsed(t.id); }
   Object.assign(t, { name, color: f.get('color') || 'sky', goalPerMonth: num(f.get('goal')), cycleDays: num(f.get('cycle')) });
   if (!t.multiDay) t.icon = f.get('icon') || t.icon || ICON_LIBRARY[0][0];
   typeDialog.close();
   commit();
+  if (day) undoable(() => { addEvent(t, day); return 'Added'; });
 });
 
 function deleteType(id) {
@@ -904,6 +923,16 @@ function setToday(k) {
 // ---------- Clicks ----------
 const ACTIONS = {
   more: el => showPopover({ kind: 'day', day: el.dataset.day }, el),
+  'pick-type': el => {
+    const day = popoverView.day;
+    closePopover();
+    undoable(() => { addEvent(typeById(el.dataset.typeId), day); return 'Added'; });
+  },
+  'pick-new-type': () => {
+    const day = popoverView.day;
+    closePopover();
+    openTypeEditor(null, day);
+  },
   'open-bin': el => showPopover({ kind: 'bin' }, el),
   'close-popover': closePopover,
   'set-status': el => {
@@ -965,22 +994,24 @@ document.addEventListener('click', ev => {
   if (!popover.contains(ev.target)) closePopover();
 });
 
-// Right-click (or long-press, below) on an empty part of a day: new event type.
+// Right-click (or long-press, below) on an empty part of a day: the type picker for that day.
 const onEmptyDay = target => !!target.closest?.('#weeks .day') && !target.closest('.event, .trip, .due, .more');
-function newTypeFromDay() {
-  if (!typeDialog.open) openTypeEditor(null);
+function openDayPicker(dayEl) {
+  if (typeDialog.open || (popoverView?.kind === 'pick' && popoverView.day === dayEl.dataset.date)) return;
+  showPopover({ kind: 'pick', day: dayEl.dataset.date }, dayEl);
 }
 
 // Touch long-press on an empty part of a day. Moving (scrolling) cancels it; Android may also
-// fire contextmenu for the same press, which finds the dialog already open.
+// fire contextmenu for the same press, which finds the picker already open.
 let dayPress = null;
 const cancelDayPress = () => { if (dayPress) { clearTimeout(dayPress.timer); dayPress = null; } };
 weeksEl.addEventListener('pointerdown', ev => {
   if (ev.pointerType === 'mouse' || !onEmptyDay(ev.target)) return;
+  const dayEl = ev.target.closest('.day');
   dayPress = { x: ev.clientX, y: ev.clientY, timer: setTimeout(() => {
     dayPress = null;
     suppressClick = true;
-    newTypeFromDay();
+    openDayPicker(dayEl);
   }, LONG_PRESS_MS) };
 });
 window.addEventListener('pointermove', ev => {
@@ -993,7 +1024,7 @@ window.addEventListener('pointercancel', cancelDayPress);
 document.addEventListener('contextmenu', ev => {
   if (onEmptyDay(ev.target)) {
     ev.preventDefault();
-    newTypeFromDay();
+    openDayPicker(ev.target.closest('.day'));
     return;
   }
   const item = ev.target.closest('.event, .trip');
