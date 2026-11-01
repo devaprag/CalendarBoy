@@ -279,8 +279,8 @@ function dragTo(src, target, from, to) {
     ok('collapse habit panel', state.settings.statsCollapsed && q('#side').classList.contains('collapsed') && q('#side-toggle').getAttribute('aria-expanded') === 'false');
     click(q('#side-toggle'));
     ok('expand habit panel', !state.settings.statsCollapsed && !q('#side').classList.contains('collapsed'));
-    click(q('.shelf-add'));
-    ok('shelf + Add opens new type dialog', typeDialog.open && q('#type-form h2').textContent === 'New event type');
+    click(q('#add-type-btn'));
+    ok('+ button opens new type dialog', typeDialog.open && q('#type-form h2').textContent === 'New event type');
     click(q('[data-action="close-dialog"]'));
 
     // Data menu opens inside the window
@@ -436,6 +436,42 @@ function dragTo(src, target, from, to) {
     ok('Save stays visible while the long picker scrolls', sv_save.bottom <= innerHeight && sv_save.top >= 0);
     click(q('[data-action="close-dialog"]'));
     click(q('[data-action="reset"]'));
+
+    // New event type: + next to the lock, random starting colour, right-click / long-press on an empty day
+    click(q('[data-action="reset"]'));
+    const sv_lockNext = q('#lock-btn').nextElementSibling;
+    ok('+ button sits next to the lock', sv_lockNext?.id === 'add-type-btn' && sv_lockNext.textContent.trim() === '+');
+    ok('no + Add button in the Event types panel', !q('#side [data-action="add-type"]'));
+    const sv_realRandom = Math.random;
+    const sv_colourWith = r => { Math.random = () => r; click(q('#add-type-btn')); const c = q('#type-form input[name="color"]:checked')?.value; click(q('[data-action="close-dialog"]')); return c; };
+    const sv_keys = Object.keys(COLORS);
+    ok('new type colour is random', sv_colourWith(0) === sv_keys[0] && sv_colourWith(0.999) === sv_keys[sv_keys.length - 1]);
+    Math.random = sv_realRandom;
+    const sv_emptyDay = day('2027-01-07'); // a Thursday with nothing on it
+    sv_emptyDay.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    ok('right-click on an empty day opens New event type', typeDialog.open && q('#type-form h2').textContent === 'New event type');
+    click(q('[data-action="close-dialog"]'));
+    const sv_ev = elOf(find('2027-01-22', 'Cinema with Alex'));
+    sv_ev.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    ok('right-click on an event still opens its details', !typeDialog.open && !popover.hidden);
+    click(document.body);
+    const sv_touch = (type, el, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId: 2, pointerType: 'touch', isPrimary: true }));
+    const sv_dc = center(sv_emptyDay);
+    sv_touch('pointerdown', sv_emptyDay, sv_dc.x, sv_dc.y);
+    await sleep(LONG_PRESS_MS + 100);
+    sv_touch('pointerup', sv_emptyDay, sv_dc.x, sv_dc.y);
+    ok('long-press on an empty day opens New event type', typeDialog.open);
+    await sleep(10); // the click after a long-press is swallowed until the finger lifts
+    click(q('[data-action="close-dialog"]'));
+    await sleep(10);
+    sv_touch('pointerdown', sv_emptyDay, sv_dc.x, sv_dc.y);
+    sv_touch('pointermove', sv_emptyDay, sv_dc.x, sv_dc.y + 40);
+    await sleep(LONG_PRESS_MS + 100);
+    sv_touch('pointerup', sv_emptyDay, sv_dc.x, sv_dc.y + 40);
+    ok('a press that moves (scrolling) does not', !typeDialog.open);
+    await sleep(10);
+    ok('Tracker button with an icon', q('[data-action="open-year"]').textContent.trim() === 'Tracker' && !!q('[data-action="open-year"] svg'));
+    ok('month title styled in two parts', q('#month-title .month-name').textContent === 'January' && q('#month-title .month-year').textContent === '2027');
 
     // The bin keeps the 5 most recently removed items
     click(q('[data-action="reset"]'));

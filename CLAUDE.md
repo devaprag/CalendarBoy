@@ -31,7 +31,7 @@ The owner is building it for fun and tests it on a Samsung phone as well as a PC
   - `svg()` wraps a 64×64 body.
   - `ICONS` maps name → SVG string.
   - `PLANE` is shared by `planeTakeoff` / `planeLanding`.
-  - `bin`, `binFull`, `lock` and `unlock` are UI-only icons.
+  - `bin`, `binFull`, `lock`, `unlock` and `tracker` are UI-only icons.
 - **`data.js`**
   - `COLORS` is the 8-colour palette, `{ c, tint }`.
   - `ICON_CATEGORIES` lists the ~50 icons the type editor offers, in groups (Fun & social, Fitness, Health, …). The groups only exist in the editor; types and events don't store them. `ICON_LIBRARY` is the same list, flattened.
@@ -98,9 +98,11 @@ Decided with the owner. Keep these unless the owner changes them.
 | Statuses | **To do → Done → Abandoned**. A **single tap/click cycles** through them in that order. New events start as To do. |
 | Looks (past *and* future alike) | To do = **coloured ring**. Done = **plain icon**. Abandoned = **greyed out**. |
 | Details popup | **Long-press** (500ms) on touch or mouse, or **right-click** on desktop. Double-click was dropped because two taps cycle the status twice. The popup has status buttons, title/time/notes/date fields, **Duplicate** (the copy lands on the next day as To do) and **Remove** (to the bin). |
+| New event type | The round blue **+** button sits **next to the lock**: in the shelf on desktop, floating bottom-left beside the lock on phones. **Right-click** (desktop) or **long-press** (touch, 500ms, cancelled by moving) on an **empty part of a day** opens it too. A new type starts in a **random palette colour** (presets bring their own). |
 | Lock | The 🔒 button: in the shelf on desktop, and a **floating round button bottom-left on phones** (mirroring the bin bottom-right). **Locked by default**, and remembered. When locked nothing can be dragged, so scrolling on a phone never moves icons. Tap and long-press still work. |
+| Month title | The month name is heavy, in a blue → purple → pink gradient; the year is light grey. |
 | Top bar | The header (title, month, Today, Data…) and the shelf under it form `.topbar`, **always on screen**: on desktop nothing else scrolls; on phones it's `position: sticky` while the page scrolls. |
-| Shelf (under the header, full width) | Lock + **Add palette** (shortcut icons to drag onto a day or the backlog: the **10 most recently used types, newest first**. Adding an event of a type, by drop or by tapping a due ghost, or creating a type, moves it to the front. Unused types fill any empty slots in sidebar order. `settings.recentTypes`, per device. Types outside the 10 can be dragged from their **sidebar icon** instead) + **Backlog** (drop zone; drag items into a new **order**). On phones the "Add" label is a **+ Add button** that opens the new-event-type dialog. **Collapsible** with its Hide / "Add & backlog" button (`settings.shelfCollapsed`, per device, expanded by default); collapsed, it keeps only the lock (desktop) and that button. |
+| Shelf (under the header, full width) | Lock + **Add palette** (shortcut icons to drag onto a day or the backlog: the **10 most recently used types, newest first**. Adding an event of a type, by drop or by tapping a due ghost, or creating a type, moves it to the front. Unused types fill any empty slots in sidebar order. `settings.recentTypes`, per device. Types outside the 10 can be dragged from their **sidebar icon** instead) + **Backlog** (drop zone; drag items into a new **order**). On phones the "Add" label is hidden. **Collapsible** with its Hide / "Add & backlog" button (`settings.shelfCollapsed`, per device, expanded by default); collapsed, it keeps only the lock and + (desktop) and that button. |
 | Desktop layout | The window never scrolls. The month fills the space under the top bar (weeks share the height), and **only the Event types sidebar scrolls**. If the window is too short for the weeks' minimum height (90px), the calendar column scrolls instead. |
 | Trips | Drag the **takeoff** icon to move **only the start**. Drag the **landing** icon to move **only the end** (start ≤ end is enforced). Drag the **dashed middle** to move the **whole trip**. The popup's start/end fields behave the same way. |
 | Months | All months: ‹ › arrows plus a **Today** button (jumps to pretend-today's month). Overflow days from neighbouring months show events and accept drops. |
@@ -113,7 +115,7 @@ Decided with the owner. Keep these unless the owner changes them.
 | Streaks | Sidebar line `🔥 3 in a row · best 6`, shown from 2. A streak counts past events of a type that were done in a row. A to do or abandoned one breaks it, except **today's to do** (there's still time). For repeat-cycle types, a gap longer than the cycle also breaks it, and so does being overdue. Trips have no streak. **Run types (`shoe` icon) count weeks instead**: `🔥 3 weeks in a row`, i.e. consecutive Sunday–Saturday weeks with at least one done run. Missed or abandoned runs don't break it; a week without a done run does, but only once that week is over. (Asked for by the owner because imported Strava runs are all done, so a per-event streak just counted every run.) |
 | Due ghosts | For a repeat-cycle type that has been done and has **no to do planned from today on**: a faint dashed icon on the next-due day, or on **today in red** if overdue. Tapping it adds a To do there. Ghosts count towards a day's visible items, and are hidden while Show done is on. |
 | Undo | One level. Status taps, drops, popup edits, Duplicate, Remove, Restore, Empty bin, planning a ghost and deleting a type show a toast with **Undo** for 6s (Ctrl+Z too, outside text fields). Repeated changes to the same items (tapping through statuses) undo back to where they started. Reset, Start fresh and Import clear it. |
-| Year view | The **Year** button in the sidebar heading opens a heatmap per single-day type: a column per week, a row per weekday, up to today's week. 53 weeks on desktop, 26 on phones (no sideways scrolling). Done = type colour, planned but not done = tint. |
+| Tracker | The **Tracker** button (with a little heatmap icon) in the sidebar heading opens a heatmap per single-day type: a column per week, a row per weekday, up to today's week. 53 weeks on desktop, 26 on phones (no sideways scrolling). Done = type colour, planned but not done = tint. |
 | Deleting a type | Deletes all its events, after a confirm showing the count. Undo brings them back. |
 | Items per day | Phones: 3, else 2 + "+N more". Desktop: **whatever fits the cell** (`fitDays()` after each render and on resize): labelled rows if they fit, else **icons only, side by side**, else as many icons as fit + "+N more". |
 | Run stats | An event with a `distance` shows **distance (km, 1 decimal) and pace (min:ss per km)** on its icon: the distance in a **round badge top right** (type colour, like an unread count) and the pace in a small white tag **bottom right**. It also shows `5.2 km · 5:46 /km` under its title. The popup has Distance (km) and Duration (h:mm:ss) fields for Run-icon (`shoe`) types, plus "View on Strava" for imported runs. Duplicate drops the stats. |
@@ -142,6 +144,8 @@ Decided with the owner. Keep these unless the owner changes them.
 - **Undo is item-level**: `undoable()` snapshots each type/event as JSON before and after, and keeps the old JSON (and array index) of only the items that changed. Undo puts those back, so changes synced in from another device meanwhile survive. New user-facing changes should go through `undoable()`.
 - **Due ghosts** are `.due` buttons, **not** `.event`: they have no `data-id`, and `.event` code (status cycling, context menu, drag) would break on them.
 - **Status changes update classes in place** (`setStatus`) and re-render only the sidebar. The icon stays put while you cycle it, even if Show done would now hide it.
+- **Trip lanes** are reserved per day (`.lane` gets `--lanes` = the lanes crossing that day), so days a trip doesn't touch keep their room for icons.
+- **Long-press on an empty day** has its own small handler (`dayPress`), separate from `press`. Android may also fire `contextmenu` for the same press; both call `newTypeFromDay()`, which does nothing if the dialog is already open.
 - **Press handling** (`pointerdown` → `press`):
   - Moving more than 6px starts a drag, or does nothing when locked, so the browser scrolls.
   - Holding for 500ms opens the details.
@@ -170,7 +174,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (135 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (144 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.

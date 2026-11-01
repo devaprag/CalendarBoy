@@ -414,6 +414,16 @@ const ICONS = {
       <path d="M26 9 V5 H38 V9" fill="none" ${OUTLINE}/>
     </g>`),
 
+  // The Tracker button: a little heatmap.
+  tracker: svg(`
+    <rect x="5" y="8" width="54" height="48" rx="8" fill="#fff" ${OUTLINE}/>
+    <rect x="11" y="15" width="9" height="9" rx="2" fill="#22c55e"/><rect x="23" y="15" width="9" height="9" rx="2" fill="#bbf7d0"/>
+    <rect x="35" y="15" width="9" height="9" rx="2" fill="#22c55e"/><rect x="47" y="15" width="6" height="9" rx="2" fill="#e2e8f0"/>
+    <rect x="11" y="27.5" width="9" height="9" rx="2" fill="#bbf7d0"/><rect x="23" y="27.5" width="9" height="9" rx="2" fill="#22c55e"/>
+    <rect x="35" y="27.5" width="9" height="9" rx="2" fill="#22c55e"/><rect x="47" y="27.5" width="6" height="9" rx="2" fill="#bbf7d0"/>
+    <rect x="11" y="40" width="9" height="9" rx="2" fill="#22c55e"/><rect x="23" y="40" width="9" height="9" rx="2" fill="#e2e8f0"/>
+    <rect x="35" y="40" width="9" height="9" rx="2" fill="#bbf7d0"/><rect x="47" y="40" width="6" height="9" rx="2" fill="#22c55e"/>`),
+
   lock: svg(`
     <path d="M20 29 V20 Q20 8 32 8 Q44 8 44 20 V29" fill="none" stroke="#2b2b2b" stroke-width="5" stroke-linecap="round"/>
     <rect x="12" y="28" width="40" height="30" rx="6" fill="#facc15" ${OUTLINE}/>

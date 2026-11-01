@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Calendar Boy</title>
-<link rel="stylesheet" href="styles.css?v=4.8">
+<link rel="stylesheet" href="styles.css?v=4.9">
 </head>
 <body class="locked">
 
@@ -38,9 +38,9 @@
 </header>
   <div class="shelf" id="shelf">
     <button class="lock-btn" id="lock-btn" data-action="toggle-lock"></button>
+    <button class="add-type-btn" id="add-type-btn" data-action="add-type" aria-label="New event type" title="New event type">+</button>
     <div class="shelf-group">
       <span class="shelf-label add-label">Add</span>
-      <button class="btn small shelf-add" data-action="add-type" title="New event type">+ Add</button>
       <div class="palette" id="palette"></div>
     </div>
     <div class="shelf-group backlog-group">
@@ -58,8 +58,7 @@
       <button class="side-toggle" id="side-toggle" data-action="toggle-stats" aria-controls="side-body">
         <h2>Event types</h2><span class="chevron" aria-hidden="true">&#9662;</span>
       </button>
-      <button class="btn small" data-action="open-year" title="A year of each habit at a glance">Year</button>
-      <button class="btn small" data-action="add-type">+ Add</button>
+      <button class="btn small tracker-btn" data-action="open-year" title="A year of each habit at a glance"><span id="tracker-icon"></span>Tracker</button>
     </div>
     <div id="side-body">
       <p class="hint" id="types-month"></p>
@@ -88,11 +87,11 @@
 <dialog id="year-dialog" class="year-dialog"></dialog>
 
 <!-- Plain scripts, not modules: modules and fetch() are blocked on file:// -->
-<script src="icons.js?v=4.8"></script>
-<script src="data.js?v=4.8"></script>
-<script src="firebase-config.js?v=4.8"></script>
+<script src="icons.js?v=4.9"></script>
+<script src="data.js?v=4.9"></script>
+<script src="firebase-config.js?v=4.9"></script>
 <script src="../strava-lib/strava-export.js?v=1"></script>
-<script src="app.js?v=4.8"></script>
-<script src="sync.js?v=4.8"></script>
+<script src="app.js?v=4.9"></script>
+<script src="sync.js?v=4.9"></script>
 </body>
 </html>

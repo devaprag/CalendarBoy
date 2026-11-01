@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.8';
+const APP_VERSION = '4.9';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 // Items per day before "+N more" on phones. On wide screens the month fills the window and
@@ -215,7 +215,9 @@ function render() {
   const locked = state.settings.locked;
   document.body.classList.toggle('locked', locked);
   todayInput.value = today();
-  $('month-title').textContent = monthTitle(viewMonth());
+  // Month and year styled separately (see .month-name / .month-year).
+  const [monthName, year] = monthTitle(viewMonth()).split(' ');
+  $('month-title').innerHTML = `<span class="month-name">${esc(monthName)}</span> <span class="month-year">${esc(year)}</span>`;
   $('filter-btn').setAttribute('aria-pressed', state.settings.showDoneOnly);
   const lockBtn = $('lock-btn');
   lockBtn.setAttribute('aria-pressed', locked);
@@ -266,13 +268,15 @@ function renderWeeks() {
     const weekStart = addDays(gridStart, w * 7);
     const ws = key(weekStart), we = key(addDays(weekStart, 6));
 
-    // Overlapping trips in the same week get stacked lanes.
-    const laneEnds = [];
+    // Overlapping trips in the same week get stacked lanes. Each day reserves room only for the
+    // lanes that cross it, so days a trip doesn't touch keep their space for icons.
+    const laneEnds = [], dayLanes = [0, 0, 0, 0, 0, 0, 0];
     const segments = trips.filter(t => t.start <= we && t.end >= ws).map(t => {
       const from = t.start > ws ? t.start : ws, to = t.end < we ? t.end : we;
       let lane = laneEnds.findIndex(end => end < from);
       if (lane === -1) lane = laneEnds.length;
       laneEnds[lane] = to;
+      for (let c = dayDiff(ws, from); c <= dayDiff(ws, to); c++) dayLanes[c] = Math.max(dayLanes[c], lane + 1);
       return renderTripSegment(t, ws, from, to, lane);
     });
 
@@ -284,14 +288,14 @@ function renderWeeks() {
       const hidden = items.length - shown.length;
       cells += `<div class="day${k.startsWith(viewMonth()) ? '' : ' other'}" data-drop="day" data-date="${k}">
         <div class="date${k === today() ? ' today' : ''}">${d.getDate()}</div>
-        <div class="lane"></div>
+        <div class="lane" style="--lanes:${dayLanes[i]}"></div>
         <div class="events">
           ${shown.join('')}
           ${hidden ? moreButton(k, hidden) : ''}
         </div>
       </div>`;
     }
-    html += `<div class="week" data-week-start="${ws}" style="--lanes:${laneEnds.length}">${cells}${segments.join('')}</div>`;
+    html += `<div class="week" data-week-start="${ws}">${cells}${segments.join('')}</div>`;
   }
   weeksEl.innerHTML = html;
   fitDays();
@@ -652,7 +656,7 @@ let editingTypeId = null;
 
 function openTypeEditor(id) {
   editingTypeId = id;
-  const t = id ? typeById(id) : { name: '', icon: ICON_LIBRARY[0][0], color: 'sky', goalPerMonth: null, cycleDays: null };
+  const t = id ? typeById(id) : { name: '', icon: ICON_LIBRARY[0][0], color: randomColor(), goalPerMonth: null, cycleDays: null };
   typeForm.innerHTML = `
     <h2>${id ? 'Edit event type' : 'New event type'}</h2>
     ${id ? '' : `<p class="field-label">Start from a preset</p>
@@ -678,6 +682,12 @@ function openTypeEditor(id) {
       <button type="submit" class="btn primary">Save</button>
     </div>`;
   typeDialog.showModal();
+}
+
+// New types start in a random palette colour (presets bring their own).
+function randomColor() {
+  const keys = Object.keys(COLORS);
+  return keys[Math.floor(Math.random() * keys.length)];
 }
 
 function applyPreset(p) {
@@ -755,7 +765,7 @@ function yearHtml(weeks) {
     </div>`;
   }).join('');
   const fmtYear = k => parseDate(k).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  return `<h2>The last ${weeks > 26 ? '12' : '6'} months</h2>
+  return `<h2>Tracker: the last ${weeks > 26 ? '12' : '6'} months</h2>
     <p class="hint">${fmtYear(from)} – ${fmtYear(to)}. One square per day, a column per week.
       <span class="heat-key"><i class="done"></i> done <i class="missed"></i> planned, not done</span></p>
     ${rows || '<p class="empty">No event types yet.</p>'}
@@ -955,8 +965,37 @@ document.addEventListener('click', ev => {
   if (!popover.contains(ev.target)) closePopover();
 });
 
+// Right-click (or long-press, below) on an empty part of a day: new event type.
+const onEmptyDay = target => !!target.closest?.('#weeks .day') && !target.closest('.event, .trip, .due, .more');
+function newTypeFromDay() {
+  if (!typeDialog.open) openTypeEditor(null);
+}
+
+// Touch long-press on an empty part of a day. Moving (scrolling) cancels it; Android may also
+// fire contextmenu for the same press, which finds the dialog already open.
+let dayPress = null;
+const cancelDayPress = () => { if (dayPress) { clearTimeout(dayPress.timer); dayPress = null; } };
+weeksEl.addEventListener('pointerdown', ev => {
+  if (ev.pointerType === 'mouse' || !onEmptyDay(ev.target)) return;
+  dayPress = { x: ev.clientX, y: ev.clientY, timer: setTimeout(() => {
+    dayPress = null;
+    suppressClick = true;
+    newTypeFromDay();
+  }, LONG_PRESS_MS) };
+});
+window.addEventListener('pointermove', ev => {
+  if (dayPress && Math.hypot(ev.clientX - dayPress.x, ev.clientY - dayPress.y) > DRAG_THRESHOLD) cancelDayPress();
+});
+window.addEventListener('pointerup', () => { if (!dayPress && suppressClick) setTimeout(() => { suppressClick = false; }, 0); cancelDayPress(); });
+window.addEventListener('pointercancel', cancelDayPress);
+
 // Right-click on desktop; on Android a long-press also arrives here.
 document.addEventListener('contextmenu', ev => {
+  if (onEmptyDay(ev.target)) {
+    ev.preventDefault();
+    newTypeFromDay();
+    return;
+  }
   const item = ev.target.closest('.event, .trip');
   if (!item) return;
   ev.preventDefault();
@@ -1267,5 +1306,6 @@ function drop(p, target, x, y) {
 
 // ---------- Start ----------
 $('brand-icon').innerHTML = ICONS.camera;
+$('tracker-icon').innerHTML = ICONS.tracker;
 $('app-version').textContent = `Version ${APP_VERSION}`;
 render();
