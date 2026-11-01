@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Calendar Boy</title>
-<link rel="stylesheet" href="styles.css?v=4.4">
+<link rel="stylesheet" href="styles.css?v=4.5">
 </head>
 <body class="locked">
 
@@ -27,11 +27,13 @@
       <button data-action="start-fresh">Start fresh (empty calendar)</button>
       <button data-action="export">Export JSON</button>
       <button data-action="import">Import JSON&hellip;</button>
+      <button data-action="import-strava">Import Strava runs (activities.csv)&hellip;</button>
       <button data-action="reset">Reset demo data</button>
       <p class="menu-version" id="app-version">Old app.js still cached: reopen the page</p>
     </div>
   </details>
   <input type="file" id="import-file" accept=".json,application/json" hidden>
+  <input type="file" id="strava-file" accept=".csv,text/csv" hidden>
 </header>
 
 <div class="app">
@@ -83,10 +85,11 @@
 <dialog id="year-dialog" class="year-dialog"></dialog>
 
 <!-- Plain scripts, not modules: modules and fetch() are blocked on file:// -->
-<script src="icons.js?v=4.4"></script>
-<script src="data.js?v=4.4"></script>
-<script src="firebase-config.js?v=4.4"></script>
-<script src="app.js?v=4.4"></script>
-<script src="sync.js?v=4.4"></script>
+<script src="icons.js?v=4.5"></script>
+<script src="data.js?v=4.5"></script>
+<script src="firebase-config.js?v=4.5"></script>
+<script src="../strava-lib/strava-export.js?v=1"></script>
+<script src="app.js?v=4.5"></script>
+<script src="sync.js?v=4.5"></script>
 </body>
 </html>

@@ -195,6 +195,15 @@ main {
   background: var(--tint);
 }
 .chip svg { width: 82%; height: 82%; display: block; }
+/* A run with stats: smaller icon on top, distance (km) and pace (min/km) as tiny numbers below it. */
+.chip.has-stats { flex-direction: column; justify-content: flex-start; padding-top: 2px; }
+.chip.has-stats svg { width: 58%; height: 46%; flex-shrink: 0; }
+.chip .stats {
+  display: flex; flex-direction: column; align-items: center;
+  line-height: 1; font-size: 9px; font-weight: 700; color: #3c4043;
+  font-variant-numeric: tabular-nums; letter-spacing: -.3px;
+}
+.chip .stats span { font-size: 8px; font-weight: 500; }
 /* To do = ring, done = plain, abandoned = grey. Same in the past and the future. */
 .todo .chip { box-shadow: 0 0 0 3px var(--c); }
 .abandoned .chip { filter: grayscale(1); opacity: .4; }
@@ -219,6 +228,10 @@ main {
   padding: 2px 6px; border: 0; background: transparent; border-radius: 6px;
   font-size: 12px; font-weight: 600; cursor: pointer;
 }
+/* A busy day on a wide screen: icons only, side by side, so more fit before "+N more". */
+.events.compact { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.events.compact .event, .events.compact .due { width: auto; padding: 2px; margin: 0; }
+.events.compact .label { display: none; }
 
 .trip {
   position: absolute; top: calc(30px + var(--lane) * 50px); height: 46px;
@@ -391,6 +404,10 @@ dialog h2 { margin: 0 0 12px; font-size: 18px; font-weight: 500; }
   .toast { bottom: 80px; }
   .year-dialog { padding: 16px; }
   .day .chip { width: 26px; height: 26px; border-radius: 7px; }
+  .day .chip.has-stats { padding-top: 1px; }
+  .day .chip.has-stats svg { height: 40%; }
+  .day .chip .stats { font-size: 7.5px; letter-spacing: -.4px; }
+  .day .chip .stats span { font-size: 6.5px; }
   .lane { height: calc(var(--lanes, 0) * 34px); }
   .trip { top: calc(28px + var(--lane) * 34px); height: 30px; }
   .trip .chip { width: 30px; height: 30px; border-radius: 8px; }

@@ -22,6 +22,7 @@ The owner is building it for fun and tests it on a Samsung phone as well as a PC
   - `icons.js`: SVG strings.
   - `data.js`: palette, icon library, presets, seed data.
   - `app.js`: state, rendering, interactions.
+  - `../strava-lib/strava-export.js`: the one file from outside this repo. It reads a Strava data export's `activities.csv` and lives in the owner's shared [strava-lib](https://github.com/devaprag/strava-lib) repo, in a sibling folder. On GitHub Pages that's `devaprag.github.io/strava-lib/`. If it's missing, only "Import Strava runs" stops working.
 - These load with **plain `<script src>` tags in that order**. On `file://`, **ES modules** fail with CORS errors and **`fetch()`** is blocked, so don't use either. That's also why seed data is a `.js` file, not `.json`.
 
 ## Code map
@@ -60,9 +61,12 @@ Stored in localStorage key `calendarBoy.v1`. The key name is historical; the obj
   version: 3,
   settings: { pretendToday: '2027-01-18'|null, viewMonth: '2027-01', showDoneOnly: false, locked: true, statsCollapsed? },
   types: [{ id, name, icon, color, goalPerMonth|null, cycleDays|null, multiDay?, endIcon? }],
-  events: [{ id, typeId, title, start|null, end|null, time, notes, status: 'todo'|'done'|'abandoned', deletedAt|null, seq, days? }]
+  events: [{ id, typeId, title, start|null, end|null, time, notes, status: 'todo'|'done'|'abandoned', deletedAt|null, seq, days?,
+             distance?, moving?, stravaId? }]
 }
 ```
+- `distance` (metres) and `moving` (seconds) are run stats. `stravaId` is set on runs imported from Strava, so re-importing never duplicates them.
+- Those three were added **without** bumping `STATE_VERSION`, on purpose. They're optional and older code ignores them. A version bump would make an old cached `app.js` treat saved data as invalid and fall back to `SEED`, and sync would then push that over the account. Only bump for changes old code can't read.
 - `pretendToday: null` means **follow the real date**. That's the normal setting for real use; "Start fresh" and "Use the real date" set it.
 - `start: null` means the event is in the **backlog**. Backlog **order comes from `seq`**, not array position, so it survives item-by-item syncing. `placeInBacklog()` gives a moved event a `seq` between its new neighbours.
 - `deletedAt` set means it is in the **bin**.
@@ -104,11 +108,14 @@ Decided with the owner. Keep these unless the owner changes them.
 | "Today" | The **"Today is" date picker** sets a pretend today (default 18 Jan 2027, so the playground has a past). Data → "Use the real date as today". |
 | Show done filter | Shows **only done** events, past and future alike. To do and abandoned are hidden. The backlog is unaffected. |
 | Sidebar | Event types with **counts for the month on screen** (`5 / 12 done · 4 planned`, plus a progress bar when there's a goal), last done, and repeat cycle / next due / **overdue** (red). On phones it sits below the calendar and **collapses/expands** by tapping its heading (`settings.statsCollapsed`, remembered; expanded by default). On desktop it is always open. |
-| Streaks | Sidebar line `🔥 3 in a row · best 6`, shown from 2. A streak counts past events of a type that were done in a row. A to do or abandoned one breaks it, except **today's to do** (there's still time). For repeat-cycle types, a gap longer than the cycle also breaks it, and so does being overdue. Trips have no streak. |
+| Streaks | Sidebar line `🔥 3 in a row · best 6`, shown from 2. A streak counts past events of a type that were done in a row. A to do or abandoned one breaks it, except **today's to do** (there's still time). For repeat-cycle types, a gap longer than the cycle also breaks it, and so does being overdue. Trips have no streak. **Run types (`shoe` icon) count weeks instead**: `🔥 3 weeks in a row`, i.e. consecutive Sunday–Saturday weeks with at least one done run. Missed or abandoned runs don't break it; a week without a done run does, but only once that week is over. (Asked for by the owner because imported Strava runs are all done, so a per-event streak just counted every run.) |
 | Due ghosts | For a repeat-cycle type that has been done and has **no to do planned from today on**: a faint dashed icon on the next-due day, or on **today in red** if overdue. Tapping it adds a To do there. Ghosts count towards a day's visible items, and are hidden while Show done is on. |
 | Undo | One level. Status taps, drops, popup edits, Duplicate, Remove, Restore, Empty bin, planning a ghost and deleting a type show a toast with **Undo** for 6s (Ctrl+Z too, outside text fields). Repeated changes to the same items (tapping through statuses) undo back to where they started. Reset, Start fresh and Import clear it. |
 | Year view | The **Year** button in the sidebar heading opens a heatmap per single-day type: a column per week, a row per weekday, up to today's week. 53 weeks on desktop, 26 on phones (no sideways scrolling). Done = type colour, planned but not done = tint. |
 | Deleting a type | Deletes all its events, after a confirm showing the count. Undo brings them back. |
+| Items per day | Phones: 3, else 2 + "+N more". Desktop: up to 3 with labels; past 3 the day switches to **icons only, side by side**, up to 8, else 7 + "+N more". |
+| Run stats | An event with a `distance` shows **distance (km, 1 decimal) and pace (min:ss per km)** as tiny numbers on its icon, and `5.2 km · 5:46 /km` under its title. The popup has Distance (km) and Duration (h:mm:ss) fields for Run-icon (`shoe`) types, plus "View on Strava" for imported runs. Duplicate drops the stats. |
+| Strava import | Data → **Import Strava runs (activities.csv)**, from Strava's free data export (the API needs a paid subscription). Each run becomes a **done** event of the Run type on its **local** day (the CSV is UTC), titled with the activity name and timed with its start. The Run type is the first single-day type with the `shoe` icon, created from the preset if missing. A run already imported only gets its numbers refreshed; one removed to the bin stays removed. A planned Run on that day with no stats is **completed** instead of duplicated. Goes through `undoable()`. |
 | Other | The recycling bin (bottom right) restores items or empties. Data menu: sync status + Sign in/out, Use the real date, **Start fresh** (empty calendar, keeps types, real date), Export / Import JSON, Reset demo data. |
 
 ## Conventions
@@ -125,6 +132,7 @@ Decided with the owner. Keep these unless the owner changes them.
 - **Every release that changes CSS or JS must bump the version** in two places:
   1. The `?v=` on all the asset links in `index.html`.
   2. `APP_VERSION` at the top of `app.js`.
+  - `strava-export.js` has its own `?v=` (strava-lib's version). Bump it when that file changes.
 - **Why:** GitHub Pages serves files with `max-age=600`, and Chrome on Android keeps using cached scripts even after a pull-to-refresh. Once, the owner's phone ran the new `index.html` with the old `app.js`: no lock, no Add icons, dead month buttons, no long-press.
 - The Data menu shows `Version x` from `app.js`, so the owner can check which code their phone is running. If the menu says "Old app.js still cached", the HTML and JS are out of step.
 
@@ -159,7 +167,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (96 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (117 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.
@@ -175,7 +183,7 @@ Decided with the owner. Keep these unless the owner changes them.
 - **Phone testing** (owner has a Samsung):
   - Enable GitHub Pages (Settings → Pages → `main` / root), giving https://devaprag.github.io/CalendarBoy/
   - Or run `npx serve -l 8000` and open `http://<PC IPv4>:8000` on the same Wi-Fi.
-- **Not covered by the tests**: real touch input (long-press timing, scrolling while locked), and Export/Import (needs a real file dialog). Say so if you change those parts.
+- **Not covered by the tests**: real touch input (long-press timing, scrolling while locked), and Export/Import JSON (needs a real file dialog). Say so if you change those parts. The Strava import *is* covered: the tests hand a synthetic file straight to the hidden file input.
 
 ## Environment and git
 - Windows 11. Both Git Bash and PowerShell are available. Node is installed. Git warns about LF→CRLF, which is harmless.

@@ -1,9 +1,13 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.4';
+const APP_VERSION = '4.5';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
-const MAX_VISIBLE = 3;
+// Items per day before "+N more": 3 on phones. Wide screens show up to 8, and past 3 the day
+// switches to icons only (no labels) so they fit side by side.
+const MAX_VISIBLE = 3, MAX_VISIBLE_WIDE = 8, MAX_LABELLED = 3;
+const narrowScreen = window.matchMedia('(max-width: 800px)');
+const RUN_ICON = 'shoe';
 const DEFAULT_TRIP_DAYS = 3;
 const LONG_PRESS_MS = 500;
 const DRAG_THRESHOLD = 6;
@@ -56,6 +60,31 @@ function fmtDate(k) { return parseDate(k).toLocaleDateString('en-GB', { weekday:
 function fmtShort(k) { return parseDate(k).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+// Run stats: distance in metres and moving time in seconds, both optional on an event.
+const two = n => String(n).padStart(2, '0');
+function fmtKm(m) { return (m / 1000).toFixed(1); }
+function fmtPace(e) {
+  if (!e.distance || !e.moving) return '';
+  const s = Math.round(e.moving / (e.distance / 1000));
+  return `${Math.floor(s / 60)}:${two(s % 60)}`;
+}
+function fmtDuration(s) {
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+  return h ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`;
+}
+// "45" = minutes, "45:30" = m:ss, "1:05:30" = h:mm:ss. Returns seconds, or null if unreadable.
+function parseDuration(v) {
+  const parts = v.trim().split(':').map(Number);
+  if (!v.trim() || parts.length > 3 || parts.some(n => !(n >= 0))) return null;
+  if (parts.length === 1) return Math.round(parts[0] * 60);
+  return Math.round(parts.reduce((total, n) => total * 60 + n, 0));
+}
+const hasRunStats = e => e.distance > 0;
+function runSummary(e) {
+  const pace = fmtPace(e);
+  return `${fmtKm(e.distance)} km${pace ? ` · ${pace} /km` : ''}`;
+}
+
 // ---------- Queries ----------
 // A null pretendToday means the real date.
 const today = () => state.settings.pretendToday || key(new Date());
@@ -96,6 +125,7 @@ function typeStats(t) {
 // still time). For repeat-cycle types, a gap longer than the cycle also breaks it, as does being overdue.
 function streaks(t, all) {
   if (t.multiDay) return { streak: 0, bestStreak: 0 };
+  if (t.icon === RUN_ICON) return weekStreaks(all);
   const past = all.filter(e => e.start <= today() && !(e.start === today() && e.status === 'todo'))
     .sort((a, b) => a.start.localeCompare(b.start) || (a.time || '~').localeCompare(b.time || '~'));
   let run = 0, best = 0, prev = null;
@@ -108,6 +138,22 @@ function streaks(t, all) {
   }
   if (t.cycleDays && prev && dayDiff(prev, today()) > t.cycleDays) run = 0;
   return { streak: run, bestStreak: best };
+}
+
+// Runs count streaks in weeks (Sunday to Saturday) with at least one done run. Only done runs count,
+// and this week doesn't break the streak until it's over.
+function weekStreaks(all) {
+  const weekOf = k => shiftKey(k, -parseDate(k).getDay());
+  const weeks = [...new Set(all.filter(e => e.status === 'done' && e.start <= today()).map(e => weekOf(e.start)))].sort();
+  let run = 0, best = 0, prev = null;
+  for (const w of weeks) {
+    run = prev && shiftKey(prev, 7) === w ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = w;
+  }
+  const thisWeek = weekOf(today());
+  const alive = prev && (prev === thisWeek || shiftKey(prev, 7) === thisWeek);
+  return { streak: alive ? run : 0, bestStreak: best, weekly: true };
 }
 
 // Repeat-cycle types that have been done before and have nothing planned get a faint "due" icon on the
@@ -138,12 +184,19 @@ function colorVars(type) {
   const c = COLORS[type.color] || COLORS.sky;
   return `--c:${c.c};--tint:${c.tint}`;
 }
-function chip(type, iconKey, cls = '') {
-  return `<span class="chip${cls ? ' ' + cls : ''}" style="${colorVars(type)}">${ICONS[iconKey || type.icon] || ICONS.camera}</span>`;
+function chip(type, iconKey, cls = '', extra = '') {
+  return `<span class="chip${cls ? ' ' + cls : ''}" style="${colorVars(type)}">${ICONS[iconKey || type.icon] || ICONS.camera}${extra}</span>`;
+}
+// A run with stats shows its distance and pace as tiny numbers on the icon.
+function runChip(e) {
+  const pace = fmtPace(e);
+  return chip(typeOf(e), null, 'has-stats', `<span class="stats"><b>${fmtKm(e.distance)}</b>${pace ? `<span>${pace}</span>` : ''}</span>`);
 }
 function renderEvent(e) {
-  return `<button class="event ${e.status}" data-id="${e.id}" data-drag="event" title="${esc(e.title)}">
-    ${chip(typeOf(e))}<span class="label">${esc(e.title)}${e.time ? `<small>${esc(e.time)}</small>` : ''}</span>
+  const stats = hasRunStats(e);
+  const sub = stats ? runSummary(e) : e.time;
+  return `<button class="event ${e.status}" data-id="${e.id}" data-drag="event" title="${esc(e.title)}${stats ? ` · ${runSummary(e)}` : ''}">
+    ${stats ? runChip(e) : chip(typeOf(e))}<span class="label">${esc(e.title)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
   </button>`;
 }
 function renderGhost(t, k) {
@@ -210,12 +263,14 @@ function renderWeeks() {
     for (let i = 0; i < 7; i++) {
       const d = addDays(weekStart, i), k = key(d);
       const items = dayItems(k, ghosts);
-      const shown = items.length > MAX_VISIBLE ? items.slice(0, MAX_VISIBLE - 1) : items;
+      const max = narrowScreen.matches ? MAX_VISIBLE : MAX_VISIBLE_WIDE;
+      const shown = items.length > max ? items.slice(0, max - 1) : items;
       const hidden = items.length - shown.length;
+      const compact = !narrowScreen.matches && items.length > MAX_LABELLED;
       cells += `<div class="day${k.startsWith(viewMonth()) ? '' : ' other'}" data-drop="day" data-date="${k}">
         <div class="date${k === today() ? ' today' : ''}">${d.getDate()}</div>
         <div class="lane"></div>
-        <div class="events">
+        <div class="events${compact ? ' compact' : ''}">
           ${shown.join('')}
           ${hidden ? `<button class="more" data-action="more" data-day="${k}">+${hidden} more</button>` : ''}
         </div>
@@ -270,7 +325,7 @@ function renderTypes() {
           <button class="icon-btn" data-action="edit-type" data-type-id="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">&#9998;</button></div>
         ${t.goalPerMonth ? `<div class="progress"><span style="width:${pct}%"></span></div>` : ''}
         <div class="stat">${s.done}${t.goalPerMonth ? ` / ${t.goalPerMonth}` : ''} done · ${s.planned} planned</div>
-        ${s.streak >= 2 ? `<div class="stat streak" title="Done ${s.streak} times in a row">&#128293; ${s.streak} in a row${s.bestStreak > s.streak ? ` · best ${s.bestStreak}` : ''}</div>` : ''}
+        ${s.streak >= 2 ? `<div class="stat streak" title="${s.weekly ? `At least one run a week, ${s.streak} weeks running` : `Done ${s.streak} times in a row`}">&#128293; ${s.streak}${s.weekly ? ' weeks' : ''} in a row${s.bestStreak > s.streak ? ` · best ${s.bestStreak}` : ''}</div>` : ''}
         <div class="stat">Last done ${s.lastDone ? fmtShort(s.lastDone) : '—'}</div>
         ${cycle}
       </div>
@@ -346,6 +401,8 @@ function addEvent(type, start, beforeId) {
 function duplicateEvent(id) {
   const e = byId(id);
   const copy = { ...e, id: newId('e'), status: 'todo', deletedAt: null };
+  // A copy is a new plan, not the same Strava activity.
+  delete copy.stravaId; delete copy.distance; delete copy.moving;
   if (e.start) {
     copy.start = shiftKey(e.start, 1);
     copy.end = e.end ? shiftKey(e.end, 1) : null;
@@ -470,11 +527,22 @@ function eventDetail(e) {
       `<button class="seg-btn${e.status === s ? ' on' : ''}" data-action="set-status" data-status="${s}">${STATUS_LABEL[s]}</button>`).join('')}</div>
     ${dates}
     <label class="field">Time<input data-field="time" value="${esc(e.time)}" placeholder="e.g. 07:00"></label>
+    ${type.icon === RUN_ICON || hasRunStats(e) ? runFields(e) : ''}
     <label class="field">Notes<textarea data-field="notes" rows="2">${esc(e.notes)}</textarea></label>
     <div class="pop-actions">
       <button class="btn" data-action="duplicate">Duplicate</button>
       <button class="btn danger" data-action="remove">Remove</button>
     </div>`;
+}
+
+function runFields(e) {
+  const pace = fmtPace(e);
+  return `<div class="field-row">
+      <label class="field">Distance (km)<input data-field="distance" inputmode="decimal" value="${e.distance ? fmtKm(e.distance) : ''}" placeholder="e.g. 5.2"></label>
+      <label class="field">Duration<input data-field="moving" value="${e.moving ? fmtDuration(e.moving) : ''}" placeholder="h:mm:ss"></label>
+    </div>
+    ${pace ? `<p class="hint">Pace ${pace} /km</p>` : ''}
+    ${e.stravaId ? `<p class="hint"><a href="https://www.strava.com/activities/${encodeURIComponent(e.stravaId)}" target="_blank" rel="noopener">View on Strava</a></p>` : ''}`;
 }
 
 function dayList(k) {
@@ -511,6 +579,18 @@ function editField(e, field, value) {
   } else if (field === 'end') {
     if (e.start && value && value >= e.start) e.end = value;
     else alert('The end date must be on or after the start date.');
+    refreshPopover();
+  } else if (field === 'distance') {
+    const km = parseFloat(value.replace(',', '.'));
+    if (km > 0) e.distance = Math.round(km * 1000);
+    else if (!value.trim()) delete e.distance;
+    else alert('Enter the distance in km, e.g. 5.2');
+    refreshPopover();
+  } else if (field === 'moving') {
+    const s = parseDuration(value);
+    if (s > 0) e.moving = s;
+    else if (!value.trim()) delete e.moving;
+    else alert('Enter the duration as h:mm:ss or mm:ss, e.g. 28:30');
     refreshPopover();
   }
   commit();
@@ -588,7 +668,6 @@ function deleteType(id) {
 // One grid per type up to today's week: a column per week, a row per weekday. A year on wide screens,
 // six months on phones so the squares stay big enough. Done = the type's colour, planned but not done = its tint.
 const yearDialog = $('year-dialog');
-const narrowScreen = window.matchMedia('(max-width: 800px)');
 
 function openYear() {
   const weeks = narrowScreen.matches ? 26 : 53;
@@ -616,10 +695,10 @@ function yearHtml(weeks) {
       const cls = n ? 'done' : missed.has(k) ? 'missed' : '';
       return `<i class="${cls}" title="${fmtDate(k)}${n ? `: done${n > 1 ? ` ×${n}` : ''}` : missed.has(k) ? ': not done' : ''}"></i>`;
     }).join('');
-    const { bestStreak } = typeStats(t);
+    const { bestStreak, weekly } = typeStats(t);
     return `<div class="heat-type" style="${colorVars(t)}">
       <div class="heat-head">${chip(t)}<span class="heat-name">${esc(t.name)}</span>
-        <span class="stat">${total} done${bestStreak >= 2 ? ` · best streak ${bestStreak}` : ''}</span></div>
+        <span class="stat">${total} done${bestStreak >= 2 ? ` · best streak ${bestStreak}${weekly ? ' weeks' : ''}` : ''}</span></div>
       <div class="heat-months">${months}</div><div class="heat">${cells}</div>
     </div>`;
   }).join('');
@@ -659,6 +738,78 @@ importInput.addEventListener('change', () => {
     importInput.value = '';
   };
   reader.readAsText(file);
+});
+
+// Strava runs from a data export's activities.csv (parsed by strava-lib/strava-export.js).
+// Each becomes a done Run event with its distance and pace. A run already imported (same stravaId)
+// only gets its numbers refreshed; a run removed to the bin stays removed. A planned Run on the
+// same day with no stats yet is completed by the activity instead of getting a duplicate.
+const stravaInput = $('strava-file');
+
+function findRunType() {
+  return state.types.find(t => !t.multiDay && t.icon === RUN_ICON && /run/i.test(t.name))
+    || state.types.find(t => !t.multiDay && t.icon === RUN_ICON)
+    || state.types.find(t => !t.multiDay && /^run/i.test(t.name));
+}
+
+function importStravaRuns(text) {
+  const runs = StravaExport.parseActivities(text).activities.filter(StravaExport.isRun);
+  if (!runs.length) return null;
+  let type = findRunType();
+  if (!type) {
+    type = { ...PRESET_TYPES.find(p => p.name === 'Run'), id: newId('t') };
+    state.types.push(type);
+  }
+  const byStrava = new Map(state.events.filter(e => e.stravaId).map(e => [e.stravaId, e]));
+  let added = 0, matched = 0, updated = 0;
+  for (const a of runs) {
+    const stats = { distance: a.distance, moving: a.moving };
+    const known = byStrava.get(a.id);
+    if (known) {
+      if (!known.deletedAt && (known.distance !== a.distance || known.moving !== a.moving)) { Object.assign(known, stats); updated++; }
+      continue;
+    }
+    const planned = live().find(e => e.typeId === type.id && e.start === a.date && !e.stravaId && !hasRunStats(e));
+    if (planned) {
+      Object.assign(planned, stats, { stravaId: a.id, status: 'done', time: planned.time || a.time });
+      byStrava.set(a.id, planned);
+      matched++;
+    } else {
+      const e = { id: newId('e'), typeId: type.id, title: a.name, start: a.date, end: null, time: a.time,
+        notes: '', status: 'done', deletedAt: null, stravaId: a.id, ...stats };
+      state.events.push(e);
+      byStrava.set(a.id, e);
+      added++;
+    }
+  }
+  commit();
+  return { added, matched, updated, total: runs.length };
+}
+
+stravaInput.addEventListener('change', () => {
+  const file = stravaInput.files[0];
+  stravaInput.value = '';
+  if (!file) return;
+  if (!window.StravaExport) {
+    alert('Strava import needs strava-lib/strava-export.js, in a strava-lib folder next to Calendar Boy.');
+    return;
+  }
+  file.text().then(text => {
+    let result;
+    try {
+      undoable(() => {
+        result = importStravaRuns(text);
+        if (!result) return '';
+        const parts = [`${result.added} added`, result.matched && `${result.matched} planned runs completed`, result.updated && `${result.updated} updated`];
+        return `Strava: ${parts.filter(Boolean).join(', ')}`;
+      });
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    if (!result) alert('No runs found in that file.');
+    else if (!result.added && !result.matched && !result.updated) alert(`All ${result.total} runs are already in the calendar.`);
+  });
 });
 
 // When signed in, these replace the calendar in the account too (sync pushes the difference).
@@ -725,6 +876,7 @@ const ACTIONS = {
   'delete-type': () => deleteType(editingTypeId),
   export: exportData,
   import: () => importInput.click(),
+  'import-strava': () => stravaInput.click(),
   reset: resetData,
 };
 
@@ -775,6 +927,8 @@ window.addEventListener('resize', () => {
   if (window.innerWidth !== lastWidth) closePopover();
   lastWidth = window.innerWidth;
 });
+// How many icons a day shows before "+N more" differs between phones and wide screens.
+narrowScreen.addEventListener('change', render);
 
 todayInput.addEventListener('change', () => { if (todayInput.value) setToday(todayInput.value); });
 

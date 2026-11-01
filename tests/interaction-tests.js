@@ -330,6 +330,95 @@ function dragTo(src, target, from, to) {
     fb = null; ready = false; syncAccount = null; synced = emptySynced();
     click(document.body);
 
+    // Busy days on a wide screen: past 3 items they go icons-only, up to 8 before "+N more"
+    click(q('[data-action="reset"]'));
+    const sv_busy = day('2027-01-13');
+    ok('busy desktop day shows all 4 as icons, no "more"', sv_busy.querySelector('.events.compact') && sv_busy.querySelectorAll('.event').length === 4 && !sv_busy.querySelector('.more'));
+    ok('quiet desktop day keeps its labels', !day('2027-01-09').querySelector('.events.compact'));
+    const sv_gymType = typeById('gym');
+    for (let i = 0; i < 5; i++) addEvent(sv_gymType, '2027-01-13');
+    ok('9 items on a desktop day: 7 icons + "+2 more"', day('2027-01-13').querySelectorAll('.event').length === 7 && day('2027-01-13').querySelector('.more').textContent === '+2 more');
+    click(q('[data-action="reset"]'));
+
+    // Strava import, through the real file input (the system file dialog itself can't be driven)
+    ok('strava-export.js loaded from ../strava-lib', !!window.StravaExport);
+    const sv_utc = (d, h) => new Date(Date.UTC(2027, 0, d, h));
+    const sv_localDay = (d, h) => key(sv_utc(d, h));
+    const sv_stamp = (d, h) => { const t = sv_utc(d, h); return `"Jan ${t.getUTCDate()}, 2027, ${t.getUTCHours() % 12 || 12}:00:00 ${t.getUTCHours() < 12 ? 'AM' : 'PM'}"`; };
+    const sv_stravaCsv = rows => 'Activity ID,Activity Date,Activity Name,Activity Type,Elapsed Time,Distance,Moving Time,Distance\n' +
+      rows.map(r => r.join(',')).join('\n') + '\n';
+    const sv_feedStrava = async text => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([text], 'activities.csv', { type: 'text/csv' }));
+      stravaInput.files = dt.files;
+      stravaInput.dispatchEvent(new Event('change'));
+      await sleep(50);
+    };
+    const sv_csv1 = sv_stravaCsv([
+      ['111', sv_stamp(11, 12), 'Easy <b>run</b>', 'Run', 1900, '5.20', 1800, '5200.0'],
+      ['222', sv_stamp(12, 12), 'Commute', 'Ride', 900, '6.00', 900, '6000.0'],
+      ['333', sv_stamp(14, 2), 'Long run', 'Run', 5400, '14.41', 5363, '14415.7'],
+    ]);
+    const sv_eventsBefore = state.events.length;
+    await sv_feedStrava(sv_csv1);
+    const sv_runType = findRunType();
+    const sv_r1 = state.events.find(e => e.stravaId === '111');
+    ok('import creates a Run type and adds only the runs', !!sv_runType && sv_runType.icon === 'shoe' && state.events.length === sv_eventsBefore + 2 && !state.events.some(e => e.stravaId === '222'));
+    ok('run lands on its local day, done, with stats', sv_r1.start === sv_localDay(11, 12) && sv_r1.status === 'done' && sv_r1.distance === 5200 && sv_r1.moving === 1800);
+    ok('import shows an undo toast', !toastEl.hidden && /2 added/.test(q('#toast-text').textContent));
+    let sv_runEl = elOf(sv_r1);
+    ok('run icon shows distance and pace', sv_runEl.querySelector('.chip.has-stats .stats b').textContent === '5.2' && sv_runEl.querySelector('.stats span').textContent === '5:46');
+    ok('run label shows km and pace', sv_runEl.querySelector('.label small').textContent === '5.2 km · 5:46 /km');
+    ok('run names are escaped', !sv_runEl.querySelector('.label b'));
+    click(q('[data-action="undo"]'));
+    ok('undo removes the imported runs', state.events.length === sv_eventsBefore && !state.events.some(e => e.stravaId));
+    await sv_feedStrava(sv_csv1);
+    const sv_countAfter = state.events.length;
+    await sv_feedStrava(sv_csv1);
+    ok('importing the same file again adds nothing', state.events.length === sv_countAfter);
+    // A planned run on the day of a new activity gets completed instead of duplicated
+    const sv_runT = findRunType();
+    addEvent(sv_runT, sv_localDay(16, 12));
+    const sv_planned = state.events[state.events.length - 1];
+    removeEvent(state.events.find(e => e.stravaId === '333').id);
+    await sv_feedStrava(sv_stravaCsv([
+      ['333', sv_stamp(14, 2), 'Long run', 'Run', 5400, '14.41', 5363, '14415.7'],
+      ['444', sv_stamp(16, 12), 'Tempo', 'Run', 1500, '5.00', 1490, '5000.0'],
+    ]));
+    ok('a planned run is completed by the activity', sv_planned.stravaId === '444' && sv_planned.status === 'done' && sv_planned.distance === 5000 && state.events.filter(e => e.stravaId === '444').length === 1);
+    ok('a run removed to the bin stays removed', state.events.filter(e => e.stravaId === '333').length === 1 && !!state.events.find(e => e.stravaId === '333').deletedAt);
+
+    // Run fields in the details popup
+    sv_runEl = elOf(state.events.find(e => e.stravaId === '111'));
+    sv_runEl.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    const sv_distIn = q('[data-field="distance"]'), sv_durIn = q('[data-field="moving"]');
+    ok('popup shows distance and duration', sv_distIn.value === '5.2' && sv_durIn.value === '30:00' && /Pace 5:46/.test(popover.textContent) && !!q('#popover a[href*="strava.com/activities/111"]'));
+    sv_distIn.value = '10'; sv_distIn.dispatchEvent(new Event('change', { bubbles: true }));
+    q('[data-field="moving"]').value = '50:00'; q('[data-field="moving"]').dispatchEvent(new Event('change', { bubbles: true }));
+    const sv_r1b = state.events.find(e => e.stravaId === '111');
+    ok('editing distance and duration updates the pace', sv_r1b.distance === 10000 && sv_r1b.moving === 3000 && /Pace 5:00/.test(popover.textContent) && elOf(sv_r1b).querySelector('.stats span').textContent === '5:00');
+    click(q('[data-action="duplicate"]'));
+    const sv_runCopy = state.events[state.events.length - 1];
+    ok('duplicating a Strava run makes a plain planned run', sv_runCopy.status === 'todo' && !sv_runCopy.stravaId && !sv_runCopy.distance && !elOf(sv_runCopy)?.querySelector('.stats'));
+    click(document.body);
+    ok('durations parse', parseDuration('45') === 2700 && parseDuration('28:30') === 1710 && parseDuration('1:05:30') === 3930 && parseDuration('abc') === null);
+
+    // Run streaks count weeks (Sun–Sat) with a done run; this week (from Sun 17 Jan) can't break it yet
+    click(q('[data-action="reset"]'));
+    state.types.push({ id: 'run', name: 'Run', icon: 'shoe', color: 'orange', goalPerMonth: 8, cycleDays: null });
+    const addRun = (start, status = 'done') => state.events.push({ id: 'run' + start, typeId: 'run', title: 'Run', start, end: null, time: '', notes: '', status, deletedAt: null });
+    ['2026-12-01', '2026-12-08', '2026-12-14', '2027-01-04', '2027-01-06', '2027-01-12'].forEach(k => addRun(k));
+    addRun('2027-01-15', 'abandoned');
+    commit();
+    const runRow = () => [...document.querySelectorAll('.type-row')].find(r => r.textContent.includes('Run'));
+    ok('run streak counts weeks, best kept', /2 weeks in a row · best 3/.test(runRow().textContent), runRow().querySelector('.streak')?.textContent);
+    addRun('2027-01-18');
+    commit();
+    ok('a run this week extends the streak', /3 weeks in a row/.test(runRow().textContent) && !/best/.test(runRow().querySelector('.streak').textContent));
+    setToday('2027-02-01');
+    ok('a whole week without a run ends it', !runRow().querySelector('.streak'));
+    click(q('[data-action="reset"]'));
+
     // Real date and Start fresh
     click(q('[data-action="real-today"]'));
     ok('"use real date" follows the clock', state.settings.pretendToday === null && today() === key(new Date()) && todayInput.value === today());
