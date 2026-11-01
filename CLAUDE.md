@@ -131,7 +131,7 @@ Decided with the owner. Keep these unless the owner changes them.
 - **Status classes**: `.todo`, `.done` and `.abandoned` on `.event` / `.trip` (and on `.pop-head`). CSS styles the `.chip` inside.
 - **Markup**: rendered with template strings. User-visible text **must** go through `esc()`.
 - **Dates**: `YYYY-MM-DD` string keys, compared as strings. `parseDate` builds a *local* Date; never `new Date('2027-01-14')` (that's UTC). Display is `en-GB`. Weeks start on **Sunday**.
-- **Comments**: match the existing density (sparse; only where something isn't obvious). CSS sections are marked `/* ---------- Name ---------- */`, with one `@media (max-width: 800px)` block at the end.
+- **Comments**: match the existing density (sparse; only where something isn't obvious). CSS sections are marked `/* ---------- Name ---------- */`, with one `@media (max-width: 800px)` block at the end. **Hover styles** are the exception: each `:hover` rule sits in its own one-line `@media (hover: hover) { … }`, so phones don't keep the last touched item highlighted ("sticky hover"). `run-tests.sh` checks this.
 
 ## Releasing (cache busting)
 - **Every release that changes CSS or JS must bump the version** in two places:
@@ -177,7 +177,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (164 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (165 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.

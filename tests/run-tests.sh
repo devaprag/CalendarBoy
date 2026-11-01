@@ -22,6 +22,14 @@ sed -e "s#href=\"styles.css\([^\"]*\)\"#href=\"$URL_ROOT/styles.css\1\"#" \
   --dump-dom "file:///$TMP/harness.html" 2>/dev/null \
   | sed -n '/<pre/,/<\/pre>/p' | sed -e 's#<[^>]*>##g' > "$TMP/out.txt"
 
+# Static check (the page can't read styles.css's rules across file:// folders): every :hover style must be
+# inside @media (hover: hover), so phones don't keep the last touched item highlighted.
+if grep -n ':hover' "$ROOT/styles.css" | grep -v '@media (hover: hover)' > "$TMP/hover.txt"; then
+  echo "FAIL every :hover style is mouse-only  [$(tr '\n' ' ' < "$TMP/hover.txt")]" >> "$TMP/out.txt"
+else
+  echo "PASS every :hover style is mouse-only" >> "$TMP/out.txt"
+fi
+
 cat "$TMP/out.txt"
 echo "---"
 echo "$(grep -c '^PASS' "$TMP/out.txt") passed, $(grep -cE '^(FAIL|ERROR)' "$TMP/out.txt" || true) failed"
