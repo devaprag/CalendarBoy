@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Calendar Boy</title>
-<link rel="stylesheet" href="styles.css?v=4.5">
+<link rel="stylesheet" href="styles.css?v=4.6">
 </head>
 <body class="locked">
 
+<div class="topbar">
 <header>
   <div class="brand"><span id="brand-icon"></span><span>Calendar Boy</span></div>
   <button class="btn" data-action="go-today" title="Jump to today's month">Today</button>
@@ -35,6 +36,20 @@
   <input type="file" id="import-file" accept=".json,application/json" hidden>
   <input type="file" id="strava-file" accept=".csv,text/csv" hidden>
 </header>
+  <div class="shelf" id="shelf">
+    <button class="lock-btn" id="lock-btn" data-action="toggle-lock"></button>
+    <div class="shelf-group">
+      <span class="shelf-label add-label">Add</span>
+      <button class="btn small shelf-add" data-action="add-type" title="New event type">+ Add</button>
+      <div class="palette" id="palette"></div>
+    </div>
+    <div class="shelf-group backlog-group">
+      <span class="shelf-label">Backlog</span>
+      <div class="backlog" id="backlog" data-drop="backlog"></div>
+    </div>
+    <button class="shelf-toggle" id="shelf-toggle" data-action="toggle-shelf" aria-controls="shelf"></button>
+  </div>
+</div>
 
 <div class="app">
   <aside id="side">
@@ -53,18 +68,6 @@
     </div>
   </aside>
   <main>
-    <div class="shelf">
-      <button class="lock-btn" id="lock-btn" data-action="toggle-lock"></button>
-      <div class="shelf-group">
-        <span class="shelf-label add-label">Add</span>
-        <button class="btn small shelf-add" data-action="add-type" title="New event type">+ Add</button>
-        <div class="palette" id="palette"></div>
-      </div>
-      <div class="shelf-group backlog-group">
-        <span class="shelf-label">Backlog</span>
-        <div class="backlog" id="backlog" data-drop="backlog"></div>
-      </div>
-    </div>
     <div class="dow"><div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div></div>
     <div class="weeks-wrap"><div class="weeks" id="weeks"></div></div>
   </main>
@@ -85,11 +88,11 @@
 <dialog id="year-dialog" class="year-dialog"></dialog>
 
 <!-- Plain scripts, not modules: modules and fetch() are blocked on file:// -->
-<script src="icons.js?v=4.5"></script>
-<script src="data.js?v=4.5"></script>
-<script src="firebase-config.js?v=4.5"></script>
+<script src="icons.js?v=4.6"></script>
+<script src="data.js?v=4.6"></script>
+<script src="firebase-config.js?v=4.6"></script>
 <script src="../strava-lib/strava-export.js?v=1"></script>
-<script src="app.js?v=4.5"></script>
-<script src="sync.js?v=4.5"></script>
+<script src="app.js?v=4.6"></script>
+<script src="sync.js?v=4.6"></script>
 </body>
 </html>

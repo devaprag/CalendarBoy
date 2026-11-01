@@ -1,11 +1,11 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.5';
+const APP_VERSION = '4.6';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
-// Items per day before "+N more": 3 on phones. Wide screens show up to 8, and past 3 the day
-// switches to icons only (no labels) so they fit side by side.
-const MAX_VISIBLE = 3, MAX_VISIBLE_WIDE = 8, MAX_LABELLED = 3;
+// Items per day before "+N more" on phones. On wide screens the month fills the window and
+// fitDays() shows whatever fits.
+const MAX_VISIBLE = 3;
 const narrowScreen = window.matchMedia('(max-width: 800px)');
 const RUN_ICON = 'shoe';
 const DEFAULT_TRIP_DAYS = 3;
@@ -187,10 +187,10 @@ function colorVars(type) {
 function chip(type, iconKey, cls = '', extra = '') {
   return `<span class="chip${cls ? ' ' + cls : ''}" style="${colorVars(type)}">${ICONS[iconKey || type.icon] || ICONS.camera}${extra}</span>`;
 }
-// A run with stats shows its distance and pace as tiny numbers on the icon.
+// A run with stats: distance (km) in a round badge top right, pace (min/km) bottom right.
 function runChip(e) {
   const pace = fmtPace(e);
-  return chip(typeOf(e), null, 'has-stats', `<span class="stats"><b>${fmtKm(e.distance)}</b>${pace ? `<span>${pace}</span>` : ''}</span>`);
+  return chip(typeOf(e), null, 'has-stats', `<span class="run-km">${fmtKm(e.distance)}</span>${pace ? `<span class="run-pace">${pace}</span>` : ''}`);
 }
 function renderEvent(e) {
   const stats = hasRunStats(e);
@@ -221,6 +221,12 @@ function render() {
   lockBtn.setAttribute('aria-pressed', locked);
   lockBtn.title = locked ? 'Icons are locked so scrolling never moves them. Tap to unlock.' : 'Icons can be dragged. Tap to lock.';
   lockBtn.innerHTML = `${locked ? ICONS.lock : ICONS.unlock}<span>${locked ? 'Locked' : 'Unlocked'}</span>`;
+  const shelfCollapsed = !!state.settings.shelfCollapsed;
+  $('shelf').classList.toggle('collapsed', shelfCollapsed);
+  const shelfToggle = $('shelf-toggle');
+  shelfToggle.setAttribute('aria-expanded', !shelfCollapsed);
+  shelfToggle.innerHTML = shelfCollapsed ? 'Add &amp; backlog &#9662;' : 'Hide &#9652;';
+  shelfToggle.title = shelfCollapsed ? 'Show the Add icons and the backlog' : 'Hide the Add icons and the backlog';
   const collapsed = !!state.settings.statsCollapsed;
   $('side').classList.toggle('collapsed', collapsed);
   $('side-toggle').setAttribute('aria-expanded', !collapsed);
@@ -263,22 +269,45 @@ function renderWeeks() {
     for (let i = 0; i < 7; i++) {
       const d = addDays(weekStart, i), k = key(d);
       const items = dayItems(k, ghosts);
-      const max = narrowScreen.matches ? MAX_VISIBLE : MAX_VISIBLE_WIDE;
-      const shown = items.length > max ? items.slice(0, max - 1) : items;
+      const shown = narrowScreen.matches && items.length > MAX_VISIBLE ? items.slice(0, MAX_VISIBLE - 1) : items;
       const hidden = items.length - shown.length;
-      const compact = !narrowScreen.matches && items.length > MAX_LABELLED;
       cells += `<div class="day${k.startsWith(viewMonth()) ? '' : ' other'}" data-drop="day" data-date="${k}">
         <div class="date${k === today() ? ' today' : ''}">${d.getDate()}</div>
         <div class="lane"></div>
-        <div class="events${compact ? ' compact' : ''}">
+        <div class="events">
           ${shown.join('')}
-          ${hidden ? `<button class="more" data-action="more" data-day="${k}">+${hidden} more</button>` : ''}
+          ${hidden ? moreButton(k, hidden) : ''}
         </div>
       </div>`;
     }
     html += `<div class="week" data-week-start="${ws}" style="--lanes:${laneEnds.length}">${cells}${segments.join('')}</div>`;
   }
   weeksEl.innerHTML = html;
+  fitDays();
+}
+
+function moreButton(k, n) {
+  return `<button class="more" data-action="more" data-day="${k}">+${n} more</button>`;
+}
+
+// Wide screens: the weeks share the window's height, so each day shows what fits: labelled rows,
+// else icons side by side, else as many icons as fit plus "+N more".
+const FIT_SLACK_PX = 4; // run badges may poke a few px below the last row
+function fitDays() {
+  if (narrowScreen.matches) return;
+  for (const box of weeksEl.querySelectorAll('.events')) {
+    const overflows = () => box.scrollHeight > box.clientHeight + FIT_SLACK_PX;
+    if (!overflows()) continue;
+    box.classList.add('compact');
+    const items = [...box.querySelectorAll('.event, .due')];
+    let hidden = 0;
+    while (overflows() && items.length) {
+      items.pop().remove();
+      hidden++;
+      box.querySelector('.more')?.remove();
+      box.insertAdjacentHTML('beforeend', moreButton(box.closest('.day').dataset.date, hidden));
+    }
+  }
 }
 
 // One strip per week row: takeoff at the start day, dashed path, landing at the end day.
@@ -868,6 +897,7 @@ const ACTIONS = {
   'start-fresh': startFresh,
   'toggle-lock': () => { state.settings.locked = !state.settings.locked; commit(); },
   'toggle-stats': () => { state.settings.statsCollapsed = !state.settings.statsCollapsed; commit(); },
+  'toggle-shelf': () => { state.settings.shelfCollapsed = !state.settings.shelfCollapsed; commit(); },
   'toggle-filter': () => { state.settings.showDoneOnly = !state.settings.showDoneOnly; commit(); },
   'add-type': () => openTypeEditor(null),
   'edit-type': el => openTypeEditor(el.dataset.typeId),
@@ -927,8 +957,15 @@ window.addEventListener('resize', () => {
   if (window.innerWidth !== lastWidth) closePopover();
   lastWidth = window.innerWidth;
 });
-// How many icons a day shows before "+N more" differs between phones and wide screens.
+// How many icons a day shows before "+N more" differs between phones and wide screens,
+// and on wide screens depends on the window's size.
 narrowScreen.addEventListener('change', render);
+let refitFrame = 0;
+window.addEventListener('resize', () => {
+  if (narrowScreen.matches || press?.dragging) return;
+  cancelAnimationFrame(refitFrame);
+  refitFrame = requestAnimationFrame(renderWeeks);
+});
 
 todayInput.addEventListener('change', () => { if (todayInput.value) setToday(todayInput.value); });
 

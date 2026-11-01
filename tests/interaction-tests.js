@@ -330,14 +330,25 @@ function dragTo(src, target, from, to) {
     fb = null; ready = false; syncAccount = null; synced = emptySynced();
     click(document.body);
 
-    // Busy days on a wide screen: past 3 items they go icons-only, up to 8 before "+N more"
+    // Wide screens: the window doesn't scroll, the top bar stays, and each day shows what fits
     click(q('[data-action="reset"]'));
-    const sv_busy = day('2027-01-13');
-    ok('busy desktop day shows all 4 as icons, no "more"', sv_busy.querySelector('.events.compact') && sv_busy.querySelectorAll('.event').length === 4 && !sv_busy.querySelector('.more'));
+    settle();
+    const sv_fits = () => [...document.querySelectorAll('#weeks .events')].every(b => b.scrollHeight <= b.clientHeight + FIT_SLACK_PX);
+    const sv_shownPlusMore = k => day(k).querySelectorAll('.event, .due').length + (parseInt(day(k).querySelector('.more')?.textContent.slice(1), 10) || 0);
+    ok('desktop page does not scroll', document.documentElement.scrollHeight <= innerHeight + 1, document.documentElement.scrollHeight + ' > ' + innerHeight);
+    ok('whole month on screen', q('#weeks').getBoundingClientRect().bottom <= innerHeight + 1);
+    ok('no day overflows its cell', sv_fits());
+    ok('busy desktop day shows all 4 (as icons if needed)', sv_shownPlusMore('2027-01-13') === 4 && day('2027-01-13').querySelectorAll('.event').length === 4);
     ok('quiet desktop day keeps its labels', !day('2027-01-09').querySelector('.events.compact'));
     const sv_gymType = typeById('gym');
-    for (let i = 0; i < 5; i++) addEvent(sv_gymType, '2027-01-13');
-    ok('9 items on a desktop day: 7 icons + "+2 more"', day('2027-01-13').querySelectorAll('.event').length === 7 && day('2027-01-13').querySelector('.more').textContent === '+2 more');
+    for (let i = 0; i < 12; i++) addEvent(sv_gymType, '2027-01-13');
+    ok('16 items on a desktop day: icons that fit + "+N more"', sv_fits() && day('2027-01-13').querySelector('.events.compact') && !!day('2027-01-13').querySelector('.more') && sv_shownPlusMore('2027-01-13') === 16);
+    // The shelf (Add icons + backlog) collapses and stays collapsed
+    click(q('#shelf-toggle'));
+    ok('shelf collapses', state.settings.shelfCollapsed && q('#palette').offsetParent === null && q('#shelf-toggle').getAttribute('aria-expanded') === 'false');
+    ok('more room for the month when the shelf is collapsed', sv_shownPlusMore('2027-01-13') === 16 && sv_fits());
+    click(q('#shelf-toggle'));
+    ok('shelf expands', !state.settings.shelfCollapsed && q('#palette').offsetParent !== null);
     click(q('[data-action="reset"]'));
 
     // Strava import, through the real file input (the system file dialog itself can't be driven)
@@ -367,7 +378,7 @@ function dragTo(src, target, from, to) {
     ok('run lands on its local day, done, with stats', sv_r1.start === sv_localDay(11, 12) && sv_r1.status === 'done' && sv_r1.distance === 5200 && sv_r1.moving === 1800);
     ok('import shows an undo toast', !toastEl.hidden && /2 added/.test(q('#toast-text').textContent));
     let sv_runEl = elOf(sv_r1);
-    ok('run icon shows distance and pace', sv_runEl.querySelector('.chip.has-stats .stats b').textContent === '5.2' && sv_runEl.querySelector('.stats span').textContent === '5:46');
+    ok('run icon shows distance and pace', sv_runEl.querySelector('.chip.has-stats .run-km').textContent === '5.2' && sv_runEl.querySelector('.run-pace').textContent === '5:46');
     ok('run label shows km and pace', sv_runEl.querySelector('.label small').textContent === '5.2 km · 5:46 /km');
     ok('run names are escaped', !sv_runEl.querySelector('.label b'));
     click(q('[data-action="undo"]'));
@@ -396,10 +407,10 @@ function dragTo(src, target, from, to) {
     sv_distIn.value = '10'; sv_distIn.dispatchEvent(new Event('change', { bubbles: true }));
     q('[data-field="moving"]').value = '50:00'; q('[data-field="moving"]').dispatchEvent(new Event('change', { bubbles: true }));
     const sv_r1b = state.events.find(e => e.stravaId === '111');
-    ok('editing distance and duration updates the pace', sv_r1b.distance === 10000 && sv_r1b.moving === 3000 && /Pace 5:00/.test(popover.textContent) && elOf(sv_r1b).querySelector('.stats span').textContent === '5:00');
+    ok('editing distance and duration updates the pace', sv_r1b.distance === 10000 && sv_r1b.moving === 3000 && /Pace 5:00/.test(popover.textContent) && elOf(sv_r1b).querySelector('.run-pace').textContent === '5:00');
     click(q('[data-action="duplicate"]'));
     const sv_runCopy = state.events[state.events.length - 1];
-    ok('duplicating a Strava run makes a plain planned run', sv_runCopy.status === 'todo' && !sv_runCopy.stravaId && !sv_runCopy.distance && !elOf(sv_runCopy)?.querySelector('.stats'));
+    ok('duplicating a Strava run makes a plain planned run', sv_runCopy.status === 'todo' && !sv_runCopy.stravaId && !sv_runCopy.distance && !elOf(sv_runCopy)?.querySelector('.run-km'));
     click(document.body);
     ok('durations parse', parseDuration('45') === 2700 && parseDuration('28:30') === 1710 && parseDuration('1:05:30') === 3930 && parseDuration('abc') === null);
 

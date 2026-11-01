@@ -59,7 +59,7 @@ Stored in localStorage key `calendarBoy.v1`. The key name is historical; the obj
 ```js
 {
   version: 3,
-  settings: { pretendToday: '2027-01-18'|null, viewMonth: '2027-01', showDoneOnly: false, locked: true, statsCollapsed? },
+  settings: { pretendToday: '2027-01-18'|null, viewMonth: '2027-01', showDoneOnly: false, locked: true, statsCollapsed?, shelfCollapsed? },
   types: [{ id, name, icon, color, goalPerMonth|null, cycleDays|null, multiDay?, endIcon? }],
   events: [{ id, typeId, title, start|null, end|null, time, notes, status: 'todo'|'done'|'abandoned', deletedAt|null, seq, days?,
              distance?, moving?, stravaId? }]
@@ -99,10 +99,12 @@ Decided with the owner. Keep these unless the owner changes them.
 | Looks (past *and* future alike) | To do = **coloured ring**. Done = **plain icon**. Abandoned = **greyed out**. |
 | Details popup | **Long-press** (500ms) on touch or mouse, or **right-click** on desktop. Double-click was dropped because two taps cycle the status twice. The popup has status buttons, title/time/notes/date fields, **Duplicate** (the copy lands on the next day as To do) and **Remove** (to the bin). |
 | Lock | The 🔒 button: in the shelf on desktop, and a **floating round button bottom-left on phones** (mirroring the bin bottom-right). **Locked by default**, and remembered. When locked nothing can be dragged, so scrolling on a phone never moves icons. Tap and long-press still work. |
-| Shelf (top of the calendar) | Lock + **Add palette** (type icons to drag onto a day or the backlog) + **Backlog** (drop zone; drag items into a new **order**). On phones the "Add" label is a **+ Add button** that opens the new-event-type dialog. |
+| Top bar | The header (title, month, Today, Data…) and the shelf under it form `.topbar`, **always on screen**: on desktop nothing else scrolls; on phones it's `position: sticky` while the page scrolls. |
+| Shelf (under the header, full width) | Lock + **Add palette** (type icons to drag onto a day or the backlog) + **Backlog** (drop zone; drag items into a new **order**). On phones the "Add" label is a **+ Add button** that opens the new-event-type dialog. **Collapsible** with its Hide / "Add & backlog" button (`settings.shelfCollapsed`, per device, expanded by default); collapsed, it keeps only the lock (desktop) and that button. |
+| Desktop layout | The window never scrolls. The month fills the space under the top bar (weeks share the height), and **only the Event types sidebar scrolls**. If the window is too short for the weeks' minimum height (90px), the calendar column scrolls instead. |
 | Trips | Drag the **takeoff** icon to move **only the start**. Drag the **landing** icon to move **only the end** (start ≤ end is enforced). Drag the **dashed middle** to move the **whole trip**. The popup's start/end fields behave the same way. |
 | Months | All months: ‹ › arrows plus a **Today** button (jumps to pretend-today's month). Overflow days from neighbouring months show events and accept drops. |
-| Month by gesture | **Phone**: a horizontal swipe on the calendar (left = next, right = previous). When unlocked, swipes that start on an icon drag it instead. **Desktop**: the mouse wheel over the calendar changes month once the month's top/bottom edge is on screen; before that it scrolls the page. One wheel gesture = one month. |
+| Month by gesture | **Phone**: a horizontal swipe on the calendar (left = next, right = previous). When unlocked, swipes that start on an icon drag it instead. **Desktop**: the mouse wheel over the calendar changes month (once the month's top/bottom edge is on screen, which it always is unless the window is very short). One wheel gesture = one month. |
 | Month slide | Changing month slides the old grid out and the new one in (260ms): **sideways** for swipes, arrows and Today; **up/down** for the wheel. Skipped when the device asks for reduced motion. |
 | Drag to the edge | While dragging, holding the icon within 36px of the calendar's left/right edge turns the month after 0.6s, and keeps turning every 0.9s while held. A blue edge strip with an arrow just above the finger shows it's about to turn. Hovering the bin (which overlaps the bottom-right corner on phones) never counts as the edge. |
 | "Today" | The **"Today is" date picker** sets a pretend today (default 18 Jan 2027, so the playground has a past). Data → "Use the real date as today". |
@@ -113,8 +115,8 @@ Decided with the owner. Keep these unless the owner changes them.
 | Undo | One level. Status taps, drops, popup edits, Duplicate, Remove, Restore, Empty bin, planning a ghost and deleting a type show a toast with **Undo** for 6s (Ctrl+Z too, outside text fields). Repeated changes to the same items (tapping through statuses) undo back to where they started. Reset, Start fresh and Import clear it. |
 | Year view | The **Year** button in the sidebar heading opens a heatmap per single-day type: a column per week, a row per weekday, up to today's week. 53 weeks on desktop, 26 on phones (no sideways scrolling). Done = type colour, planned but not done = tint. |
 | Deleting a type | Deletes all its events, after a confirm showing the count. Undo brings them back. |
-| Items per day | Phones: 3, else 2 + "+N more". Desktop: up to 3 with labels; past 3 the day switches to **icons only, side by side**, up to 8, else 7 + "+N more". |
-| Run stats | An event with a `distance` shows **distance (km, 1 decimal) and pace (min:ss per km)** as tiny numbers on its icon, and `5.2 km · 5:46 /km` under its title. The popup has Distance (km) and Duration (h:mm:ss) fields for Run-icon (`shoe`) types, plus "View on Strava" for imported runs. Duplicate drops the stats. |
+| Items per day | Phones: 3, else 2 + "+N more". Desktop: **whatever fits the cell** (`fitDays()` after each render and on resize): labelled rows if they fit, else **icons only, side by side**, else as many icons as fit + "+N more". |
+| Run stats | An event with a `distance` shows **distance (km, 1 decimal) and pace (min:ss per km)** on its icon: the distance in a **round badge top right** (type colour, like an unread count) and the pace in a small white tag **bottom right**. It also shows `5.2 km · 5:46 /km` under its title. The popup has Distance (km) and Duration (h:mm:ss) fields for Run-icon (`shoe`) types, plus "View on Strava" for imported runs. Duplicate drops the stats. |
 | Strava import | Data → **Import Strava runs (activities.csv)**, from Strava's free data export (the API needs a paid subscription). Each run becomes a **done** event of the Run type on its **local** day (the CSV is UTC), titled with the activity name and timed with its start. The Run type is the first single-day type with the `shoe` icon, created from the preset if missing. A run already imported only gets its numbers refreshed; one removed to the bin stays removed. A planned Run on that day with no stats is **completed** instead of duplicated. Goes through `undoable()`. |
 | Other | The recycling bin (bottom right) restores items or empties. Data menu: sync status + Sign in/out, Use the real date, **Start fresh** (empty calendar, keeps types, real date), Export / Import JSON, Reset demo data. |
 
@@ -162,12 +164,13 @@ Decided with the owner. Keep these unless the owner changes them.
   - Any month change must go through `goToMonth()`.
 - **Popup and resize**: the popup closes on resize only if the **width** changes. The phone keyboard changes the height while editing.
 - **Layout**:
-  - `.week` must be `flex: 1 0 auto`.
+  - `.week` is `flex: 1 1 0` on desktop (weeks share the window height; `fitDays()` trims what doesn't fit) and `flex: 1 0 auto` on phones (weeks grow with their content). `.day` is a column flex box with `overflow: hidden`, and its `.events` takes the leftover height, which is what `fitDays()` measures.
+  - The shelf lives in `.topbar`, outside `main`, so swipes and the wheel over it never change month.
   - Grid columns must be `repeat(7, minmax(0, 1fr))`.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (117 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (123 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.
