@@ -23,6 +23,7 @@ The owner is building it for fun and tests it on a Samsung phone as well as a PC
   - `data.js`: palette, icon library, presets, seed data.
   - `app.js`: state, rendering, interactions.
   - `../strava-lib/strava-export.js`: the one file from outside this repo. It reads a Strava data export's `activities.csv` and lives in the owner's shared [strava-lib](https://github.com/devaprag/strava-lib) repo, in a sibling folder. On GitHub Pages that's `devaprag.github.io/strava-lib/`. If it's missing, only "Import Strava runs" stops working.
+  - `manifest.webmanifest`, `sw.js` and `icons/` make it an **installable app** (see [Installable app](#installable-app-pwa)).
 - These load with **plain `<script src>` tags in that order**. On `file://`, **ES modules** fail with CORS errors and **`fetch()`** is blocked, so don't use either. That's also why seed data is a `.js` file, not `.json`.
 
 ## Code map
@@ -89,6 +90,14 @@ Stored in localStorage key `calendarBoy.v1`. The key name is historical; the obj
 - **Status dot** on the Data button: green synced, amber syncing/offline, red error. The menu shows details and Sign in / Sign out.
 - **Cost**: free Spark plan. Each app open that's more than 30 minutes after the last one re-reads every document, so thousands of events times many opens a day could approach the 50k reads/day free limit. That's fine for years of personal use; revisit if it grows.
 - **Tests** cover the sync logic with a fake Firestore. Real Firebase and Google sign-in are **not** covered.
+
+## Installable app (PWA)
+- **Pieces**: `manifest.webmanifest` (name, `standalone`, icons), `icons/` (PNGs rendered from the `camera` icon on its lavender tint, the logo inside the maskable safe zone), and `sw.js`, a service worker registered from `app.js` **only over http(s)**. On `file://` nothing changes.
+- **Install**: Chrome offers it from its menu. The Data menu also shows **Install as app** once Chrome fires `beforeinstallprompt`.
+- **`sw.js` is network-first**: online, every file is fetched fresh (`cache: 'no-cache'` revalidates past GitHub Pages' `max-age=600`), so new releases show up straight away. The cache is only the offline fallback. **Never make it cache-first**: that would bring back the stale-code problem (see Releasing).
+- It precaches `./` plus every `src`/`href` in `index.html` (so the version list stays in one place), and caches the Firebase SDK scripts (opaque responses) when they're first fetched. It ignores everything else, including Firestore and sign-in traffic.
+- The installed app shares the site's storage (localStorage, Firestore's IndexedDB, the sign-in), so it opens signed in with the same data.
+- **Testing**: `run-tests.sh` checks the manifest and icons. Offline behaviour needs the page served over http(s), so it isn't covered by the tests. Check it on the phone: open the app, go offline, reopen.
 
 ## Behaviour spec
 Decided with the owner. Keep these unless the owner changes them.
@@ -177,7 +186,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (165 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (166 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` lets them finish.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.

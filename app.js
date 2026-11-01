@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.14';
+const APP_VERSION = '4.15';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 // Items per day before "+N more" on phones. On wide screens the month fills the window and
@@ -968,6 +968,7 @@ const ACTIONS = {
   'delete-type': () => deleteType(editingTypeId),
   export: exportData,
   import: () => importInput.click(),
+  'install-app': installApp,
   'import-strava': () => stravaInput.click(),
   reset: resetData,
 };
@@ -1368,4 +1369,25 @@ function drop(p, target, x, y) {
 $('brand-icon').innerHTML = ICONS.camera;
 $('tracker-icon').innerHTML = ICONS.tracker;
 $('app-version').textContent = `Version ${APP_VERSION}`;
+// ---------- Installable app ----------
+// Over http(s) a service worker (sw.js) keeps a copy for offline use, which also lets Chrome install
+// Calendar Boy as an app. The Data menu offers "Install as app" when Chrome says it can.
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => { /* offline copy unavailable; the site still works */ });
+}
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', ev => {
+  ev.preventDefault();
+  installPrompt = ev;
+  $('install-app').hidden = false;
+});
+window.addEventListener('appinstalled', () => { installPrompt = null; $('install-app').hidden = true; });
+async function installApp() {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  $('install-app').hidden = true;
+}
+
 render();

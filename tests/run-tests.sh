@@ -30,6 +30,21 @@ else
   echo "PASS every :hover style is mouse-only" >> "$TMP/out.txt"
 fi
 
+# Static check: the app manifest (needed to install Calendar Boy as a phone app) parses, and each
+# icon it lists exists as a PNG of the stated size.
+if node -e '
+  const fs = require("fs"), root = process.argv[1];
+  const m = JSON.parse(fs.readFileSync(root + "/manifest.webmanifest", "utf8"));
+  if (!m.name || !m.start_url || m.display !== "standalone" || !m.icons?.length) throw new Error("manifest fields");
+  for (const i of m.icons) {
+    const b = fs.readFileSync(root + "/" + i.src);
+    if (b.readUInt32BE(0) !== 0x89504e47 || b.readUInt32BE(16) + "x" + b.readUInt32BE(20) !== i.sizes) throw new Error(i.src);
+  }' "$ROOT" 2> "$TMP/manifest.txt"; then
+  echo "PASS app manifest and icons are valid" >> "$TMP/out.txt"
+else
+  echo "FAIL app manifest and icons are valid  [$(tr '\n' ' ' < "$TMP/manifest.txt")]" >> "$TMP/out.txt"
+fi
+
 cat "$TMP/out.txt"
 echo "---"
 echo "$(grep -c '^PASS' "$TMP/out.txt") passed, $(grep -cE '^(FAIL|ERROR)' "$TMP/out.txt" || true) failed"

@@ -67,6 +67,7 @@ header h1 { margin: 0 0 0 4px; font-size: 26px; line-height: 1.1; white-space: n
   min-width: 220px; max-width: calc(100vw - 16px); padding: 6px 0;
   background: var(--bg); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.2);
 }
+.menu-list [hidden] { display: none; }
 .menu-list button { display: block; width: 100%; padding: 8px 16px; border: 0; background: none; text-align: left; cursor: pointer; }
 @media (hover: hover) { .menu-list button:hover { background: var(--hover); } }
 .menu-note { margin: 0; padding: 6px 16px 8px; font-size: 13px; line-height: 1.5; border-bottom: 1px solid var(--hover); }
