@@ -60,7 +60,7 @@ Stored in localStorage key `calendarBoy.v1`. The key name is historical; the obj
 ```js
 {
   version: 3,
-  settings: { pretendToday: '2027-01-18'|null, viewMonth: '2027-01', showDoneOnly: false, locked: true, statsCollapsed?, shelfCollapsed?, recentTypes? },
+  settings: { pretendToday: '2027-01-18'|null, viewMonth: '2027-01', locked: true, statsCollapsed?, shelfCollapsed?, recentTypes? },
   types: [{ id, name, icon, color, goalPerMonth|null, cycleDays|null, multiDay?, endIcon? }],
   events: [{ id, typeId, title, start|null, end|null, time, notes, status: 'todo'|'done'|'abandoned', deletedAt|null, seq, days?,
              distance?, moving?, stravaId? }]
@@ -111,7 +111,7 @@ Decided with the owner. Keep these unless the owner changes them.
 | Adding on a day | **Right-click** (desktop) or **long-press** (touch, 500ms, cancelled by moving) on an **empty part of a day** opens a panel next to it listing **every event type** (recently used first). Picking one adds it to that day (with Undo). Its **+ New event type** button opens the type editor, which says the day; saving creates the type **and adds it on that day**. |
 | Lock | The 🔒 button: in the shelf on desktop, and a **floating round button bottom-left on phones** (mirroring the bin bottom-right). **Locked by default**, and remembered. When locked nothing can be dragged, so scrolling on a phone never moves icons. Tap and long-press still work. |
 | Dark mode | Follows the device setting (`prefers-color-scheme`). Event icons keep their pastel chips; the lock, bin and logo get lighter outlines; season colours and other accents have brighter dark versions. |
-| Month title | The month name is heavy, in a **solid colour for its Sydney season** (`season()`; southern hemisphere): summer Dec–Feb orange, autumn Mar–May amber-brown, winter Jun–Aug deep blue, spring Sep–Nov jacaranda purple. The year is light grey. The "Calendar Boy" title is bold dark green. |
+| Month title | On phones the month is shortened to three letters (`Jan 2027`) so the header fits on one row. The month name is heavy, in a **solid colour for its Sydney season** (`season()`; southern hemisphere): summer Dec–Feb orange, autumn Mar–May amber-brown, winter Jun–Aug deep blue, spring Sep–Nov jacaranda purple. The year is light grey. The "Calendar Boy" title is bold dark green. |
 | Top bar | The header (title, month, Today, Data…) and the shelf under it form `.topbar`, **always on screen**: on desktop nothing else scrolls; on phones it's `position: sticky` while the page scrolls. |
 | Shelf (under the header, full width) | Lock + **Add palette** (shortcut icons to drag onto a day or the backlog: the **10 most recently used types, newest first**. Adding an event of a type, by drop or by tapping a due ghost, or creating a type, moves it to the front. Unused types fill any empty slots in sidebar order. `settings.recentTypes`, per device. Types outside the 10 can be dragged from their **sidebar icon** instead) + **Backlog** (drop zone; drag items into a new **order**). On phones the "Add" label is hidden. **Collapsible** with its Hide / "Add & backlog" button (`settings.shelfCollapsed`, per device, expanded by default); collapsed, it keeps only the lock and + (desktop) and that button. |
 | Desktop layout | The window never scrolls. The month fills the space under the top bar (weeks share the height), and **only the Event types sidebar scrolls**. If the window is too short for the weeks' minimum height (90px), the calendar column scrolls instead. |
@@ -120,11 +120,11 @@ Decided with the owner. Keep these unless the owner changes them.
 | Month by gesture | **Phone**: a horizontal swipe on the calendar (left = next, right = previous). The month **follows the finger** with its neighbour sliding in beside it; letting go past a quarter of the width, or with a flick, turns the page, otherwise it springs back. When unlocked, swipes that start on an icon drag it instead. **Desktop**: the mouse wheel over the calendar changes month (once the month's top/bottom edge is on screen, which it always is unless the window is very short). One wheel gesture = one month. |
 | Month slide | Changing month slides the old grid out and the new one in (260ms): **sideways** for arrows and Today; **up/down** for the wheel. Finger swipes do their own slide (see above). Skipped when the device asks for reduced motion. |
 | Drag to the edge | While dragging, holding the icon within 36px of the calendar's left/right edge turns the month after 0.6s, and keeps turning every 0.9s while held. A blue edge strip with an arrow just above the finger shows it's about to turn. Hovering the bin (which overlaps the bottom-right corner on phones) never counts as the edge. |
-| "Today" | The **"Today is" date picker** sets a pretend today (default 18 Jan 2027, so the playground has a past). Data → "Use the real date as today". |
-| Show done filter | Shows **only done** events, past and future alike. To do and abandoned are hidden. The backlog is unaffected. |
+| "Today" | Normally the real date. The demo data sets a pretend today (18 Jan 2027, so the playground has a past); Data → "Use the real date as today" goes back. There is no date picker (removed in 4.17). |
+| Show done filter | Removed in 4.17. Every event always shows; an old saved `showDoneOnly` is dropped on load. |
 | Sidebar | Event types with **counts for the month on screen** (`5 / 12 done · 4 planned`, plus a progress bar when there's a goal), last done, and repeat cycle / next due / **overdue** (red). On phones it sits below the calendar and **collapses/expands** by tapping its heading (`settings.statsCollapsed`, remembered; expanded by default). On desktop it is always open. |
 | Streaks | Sidebar line `🔥 3 in a row · best 6`, shown from 2. A streak counts past events of a type that were done in a row. A to do or abandoned one breaks it, except **today's to do** (there's still time). For repeat-cycle types, a gap longer than the cycle also breaks it, and so does being overdue. Trips have no streak. **Run types (`shoe` icon) count weeks instead**: `🔥 3 weeks in a row`, i.e. consecutive Sunday–Saturday weeks with at least one done run. Missed or abandoned runs don't break it; a week without a done run does, but only once that week is over. (Asked for by the owner because imported Strava runs are all done, so a per-event streak just counted every run.) |
-| Due ghosts | For a repeat-cycle type that has been done and has **no to do planned from today on**: a faint dashed icon on the next-due day, or on **today in red** if overdue. Tapping it adds a To do there. Ghosts count towards a day's visible items, and are hidden while Show done is on. |
+| Due ghosts | For a repeat-cycle type that has been done and has **no to do planned from today on**: a faint dashed icon on the next-due day, or on **today in red** if overdue. Tapping it adds a To do there. Ghosts count towards a day's visible items. |
 | Undo | One level. Status taps, drops, popup edits, Duplicate, Remove, Restore, Empty bin, planning a ghost and deleting a type show a toast with **Undo** for 6s (Ctrl+Z too, outside text fields). Repeated changes to the same items (tapping through statuses) undo back to where they started. Reset, Start fresh and Import clear it. |
 | Tracker | The **Tracker** button (with a little heatmap icon) in the sidebar heading opens a heatmap per single-day type: a column per week, a row per weekday, up to today's week. 53 weeks on desktop, 26 on phones (no sideways scrolling). Done = type colour, planned but not done = tint. |
 | Deleting a type | Deletes all its events, after a confirm showing the count. Undo brings them back. |
@@ -155,7 +155,7 @@ Decided with the owner. Keep these unless the owner changes them.
 ## Gotchas (don't reintroduce)
 - **Undo is item-level**: `undoable()` snapshots each type/event as JSON before and after, and keeps the old JSON (and array index) of only the items that changed. Undo puts those back, so changes synced in from another device meanwhile survive. New user-facing changes should go through `undoable()`.
 - **Due ghosts** are `.due` buttons, **not** `.event`: they have no `data-id`, and `.event` code (status cycling, context menu, drag) would break on them.
-- **Status changes update classes in place** (`setStatus`) and re-render only the sidebar. The icon stays put while you cycle it, even if Show done would now hide it.
+- **Status changes update classes in place** (`setStatus`) and re-render only the sidebar. The icon stays put while you cycle it.
 - **Trip lanes** are reserved per day (`.lane` gets `--lanes` = the lanes crossing that day), so days a trip doesn't touch keep their room for icons.
 - **Long-press on an empty day** has its own small handler (`dayPress`), separate from `press`. Android may also fire `contextmenu` for the same press; both call `openDayPicker()`, which does nothing if that day's picker (popover kind `pick`) is already open.
 - **Type editor opened from a day's picker** remembers it in `addToDay`; the submit handler adds the new type's event there. The plain + button leaves it null.
@@ -189,7 +189,7 @@ Decided with the owner. Keep these unless the owner changes them.
 
 ## Verifying changes
 - **Interaction tests**: run `bash tests/run-tests.sh` (Git Bash).
-  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (175 at the time of writing).
+  - It loads the real page in headless Edge with `tests/interaction-tests.js`, which fires synthetic pointer, click and contextmenu events, and prints PASS/FAIL lines (172 at the time of writing).
   - The tests are async (long-press waits); `--virtual-time-budget` (20s) lets them finish. If a run prints only the static checks, the budget ran out: raise it.
   - Each run uses a fresh profile, so state starts from `SEED`.
   - Add a test when you add a behaviour.

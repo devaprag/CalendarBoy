@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#1f1f1f" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="stylesheet" href="styles.css?v=4.16">
+<link rel="stylesheet" href="styles.css?v=4.17">
 </head>
 <body class="locked">
 
@@ -21,10 +21,6 @@
   <button class="nav-btn" data-action="next-month" aria-label="Next month">&#8250;</button>
   <h1 id="month-title"></h1>
   <span class="spacer"></span>
-  <label class="today-pick" title="Pretend today, so the demo months have a past and a future">Today is
-    <input type="date" id="today-input">
-  </label>
-  <button class="toggle" id="filter-btn" data-action="toggle-filter" aria-pressed="false" title="Show only events that are done">&#10003; Show done</button>
   <details class="menu">
     <summary>Data <span class="sync-badge" id="sync-badge"></span></summary>
     <div class="menu-list">
@@ -93,11 +89,11 @@
 <dialog id="year-dialog" class="year-dialog"></dialog>
 
 <!-- Plain scripts, not modules: modules and fetch() are blocked on file:// -->
-<script src="icons.js?v=4.16"></script>
-<script src="data.js?v=4.16"></script>
-<script src="firebase-config.js?v=4.16"></script>
+<script src="icons.js?v=4.17"></script>
+<script src="data.js?v=4.17"></script>
+<script src="firebase-config.js?v=4.17"></script>
 <script src="../strava-lib/strava-export.js?v=1"></script>
-<script src="app.js?v=4.16"></script>
-<script src="sync.js?v=4.16"></script>
+<script src="app.js?v=4.17"></script>
+<script src="sync.js?v=4.17"></script>
 </body>
 </html>

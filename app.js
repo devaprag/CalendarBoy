@@ -1,6 +1,6 @@
 // ---------- Constants ----------
 // Keep in step with the ?v= on the asset links in index.html; bump both on every release.
-const APP_VERSION = '4.16';
+const APP_VERSION = '4.17';
 const STORE_KEY = 'calendarBoy.v1'; // key kept from v1; the stored object carries its own version
 const STATE_VERSION = 3;
 // Items per day before "+N more" on phones. On wide screens the month fills the window and
@@ -20,7 +20,7 @@ let state = loadState();
 function loadState() {
   try {
     const saved = migrate(JSON.parse(localStorage.getItem(STORE_KEY)));
-    if (isValidState(saved)) return saved;
+    if (isValidState(saved)) { delete saved.settings.showDoneOnly; return saved; }
   } catch (err) { /* storage blocked or corrupt: fall back to the demo data */ }
   return structuredClone(SEED);
 }
@@ -101,13 +101,11 @@ const live = () => state.events.filter(e => !e.deletedAt && typeOf(e));
 const scheduled = () => live().filter(e => e.start);
 const isTrip = e => !!typeOf(e)?.multiDay;
 const isPast = e => !!e.start && e.start <= today(); // today counts as the past
-// Show done hides everything that isn't done, past and future alike.
-const isHidden = e => state.settings.showDoneOnly && e.status !== 'done';
 const newId = prefix => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 function eventsOn(k) {
   return scheduled()
-    .filter(e => !e.end && e.start === k && !isHidden(e))
+    .filter(e => !e.end && e.start === k)
     .sort((a, b) => (a.time || '~').localeCompare(b.time || '~'));
 }
 
@@ -164,7 +162,6 @@ function weekStreaks(all) {
 // day they're next due (today, if overdue). Returns day -> [type]. Hidden while Show done is on.
 function dueGhosts() {
   const byDay = new Map();
-  if (state.settings.showDoneOnly) return byDay;
   for (const t of state.types) {
     if (!t.cycleDays || t.multiDay) continue;
     const { nextDue } = typeStats(t);
@@ -181,7 +178,7 @@ const $ = id => document.getElementById(id);
 const weeksEl = $('weeks'), typesEl = $('types'), backlogEl = $('backlog'), paletteEl = $('palette');
 const popover = $('popover'), popBody = $('pop-body');
 const typeDialog = $('type-dialog'), typeForm = $('type-form');
-const todayInput = $('today-input'), importInput = $('import-file');
+const importInput = $('import-file');
 
 // ---------- Render ----------
 function colorVars(type) {
@@ -218,11 +215,11 @@ function dayItems(k, ghosts) {
 function render() {
   const locked = state.settings.locked;
   document.body.classList.toggle('locked', locked);
-  todayInput.value = today();
   // Month and year styled separately (see .month-name / .month-year); the month wears its season's colour.
+  // Phones show the month as three letters (Jan, Feb, …) to keep the header on one row.
   const [monthName, year] = monthTitle(viewMonth()).split(' ');
-  $('month-title').innerHTML = `<span class="month-name ${season(viewMonth())}">${esc(monthName)}</span> <span class="month-year">${esc(year)}</span>`;
-  $('filter-btn').setAttribute('aria-pressed', state.settings.showDoneOnly);
+  const shownName = narrowScreen.matches ? monthName.slice(0, 3) : monthName;
+  $('month-title').innerHTML = `<span class="month-name ${season(viewMonth())}" title="${esc(monthName)}">${esc(shownName)}</span> <span class="month-year">${esc(year)}</span>`;
   const lockBtn = $('lock-btn');
   lockBtn.setAttribute('aria-pressed', locked);
   lockBtn.title = locked ? 'Icons are locked so scrolling never moves them. Tap to unlock.' : 'Icons can be dragged. Tap to lock.';
@@ -272,7 +269,7 @@ function weeksHtml(ym) {
   const first = new Date(y, m - 1, 1);
   const gridStart = addDays(first, -first.getDay());
   const weekCount = Math.ceil((first.getDay() + new Date(y, m, 0).getDate()) / 7);
-  const trips = scheduled().filter(e => e.end && !isHidden(e)).sort((a, b) => a.start.localeCompare(b.start));
+  const trips = scheduled().filter(e => e.end).sort((a, b) => a.start.localeCompare(b.start));
   const ghosts = dueGhosts();
   let html = '';
   for (let w = 0; w < weekCount; w++) {
@@ -965,7 +962,6 @@ const ACTIONS = {
   'toggle-lock': () => { state.settings.locked = !state.settings.locked; commit(); },
   'toggle-stats': () => { state.settings.statsCollapsed = !state.settings.statsCollapsed; commit(); },
   'toggle-shelf': () => { state.settings.shelfCollapsed = !state.settings.shelfCollapsed; commit(); },
-  'toggle-filter': () => { state.settings.showDoneOnly = !state.settings.showDoneOnly; commit(); },
   'add-type': () => openTypeEditor(null),
   'edit-type': el => openTypeEditor(el.dataset.typeId),
   preset: el => applyPreset(PRESET_TYPES[el.dataset.preset]),
@@ -1093,7 +1089,6 @@ window.addEventListener('resize', () => {
   refitFrame = requestAnimationFrame(renderWeeks);
 });
 
-todayInput.addEventListener('change', () => { if (todayInput.value) setToday(todayInput.value); });
 
 // The Data menu opens right-aligned under its button, nudged sideways if that would leave the screen
 // (on phones the header wraps and the button can end up at the left edge).

@@ -145,21 +145,10 @@ function dragTo(src, target, from, to) {
     click(q('[data-action="go-today"]'));
     await sleep(SLIDE_MS + 100);
 
-    // Show done filter: only done events show, past and future alike
+    // The "Today is" picker and the Show done filter were removed
     click(q('[data-action="reset"]'));
-    const missedGym = state.events.find(e => e.typeId === 'gym' && e.start < '2027-01-18' && e.status === 'todo' && e.start >= '2027-01-01');
-    const abandoned = find('2027-01-13', 'Movie night at home');
-    const doneEv = find('2027-01-09', 'Call Mum');
-    const futureEv = find('2027-01-22', 'Cinema with Alex');
-    click(q('#filter-btn'));
-    ok('filter hides past to-do + abandoned', !elOf(missedGym) && !q(`[data-id="${abandoned.id}"]`));
-    ok('filter keeps past done', !!elOf(doneEv));
-    ok('filter hides future to-do', !elOf(futureEv));
-    futureEv.status = 'done'; render();
-    ok('filter keeps future done', !!elOf(futureEv));
-    futureEv.status = 'todo';
-    click(q('#filter-btn'));
-    ok('filter off shows future to-do again', !!elOf(futureEv));
+    ok('no "Today is" picker or Show done button', !q('#today-input') && !q('#filter-btn'));
+    ok('a past to-do and an abandoned event both show', !!elOf(find('2027-01-13', 'Movie night at home')) && !!elOf(find('2027-01-22', 'Cinema with Alex')));
 
     // Sidebar stats
     const rows = [...document.querySelectorAll('.type-row')].map(r => r.textContent.replace(/\s+/g, ' '));
@@ -187,9 +176,6 @@ function dragTo(src, target, from, to) {
     typeById('tst').cycleDays = 10; render();
     const ghost = day('2027-01-22').querySelector('.due[data-type-id="tst"]');
     ok('due ghost on the due day', !!ghost && !ghost.classList.contains('overdue') && !q('.due.overdue'));
-    click(q('#filter-btn'));
-    ok('Show done hides ghosts', !q('.due'));
-    click(q('#filter-btn'));
     click(day('2027-01-22').querySelector('.due[data-type-id="tst"]'));
     const planned = state.events.find(e => e.typeId === 'tst' && e.start === '2027-01-22');
     ok('tapping a ghost plans it', !!planned && planned.status === 'todo' && !!elOf(planned) && !q('.due[data-type-id="tst"]'));
@@ -564,6 +550,7 @@ function dragTo(src, target, from, to) {
     click(document.body);
     ok('Tracker button with an icon', q('[data-action="open-year"]').textContent.trim() === 'Tracker' && !!q('[data-action="open-year"] svg'));
     ok('month title styled in two parts', q('#month-title .month-name').textContent === 'January' && q('#month-title .month-year').textContent === '2027');
+    ok('desktop shows the full month name', !narrowScreen.matches && q('#month-title .month-name').textContent.length > 3);
     ok('month colour follows Sydney seasons', q('#month-title .month-name').classList.contains('summer')
       && ['2027-03', '2027-06', '2027-09', '2027-12', '2027-02'].map(season).join() === 'autumn,winter,spring,summer,summer');
     const sv_brand = getComputedStyle(q('.brand'));
@@ -602,7 +589,7 @@ function dragTo(src, target, from, to) {
 
     // Real date and Start fresh
     click(q('[data-action="real-today"]'));
-    ok('"use real date" follows the clock', state.settings.pretendToday === null && today() === key(new Date()) && todayInput.value === today());
+    ok('"use real date" follows the clock', state.settings.pretendToday === null && today() === key(new Date()));
     const typeCount = state.types.length;
     click(q('[data-action="start-fresh"]'));
     ok('start fresh empties events, keeps types', state.events.length === 0 && state.types.length === typeCount && state.settings.pretendToday === null);

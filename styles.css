@@ -82,18 +82,11 @@ header h1 { margin: 0 0 0 4px; font-size: 26px; line-height: 1.1; white-space: n
 .month-name.spring { color: var(--spring); } /* Sep–Nov: jacaranda purple */
 .month-year { font-weight: 300; color: var(--muted); }
 .spacer { flex: 1; }
-.today-pick {
-  display: flex; align-items: center; gap: 6px;
-  border: 1px solid var(--line); border-radius: 18px; padding: 3px 8px 3px 14px;
-  font-size: 13px; color: var(--muted);
-}
-.today-pick input { border: 0; background: transparent; color: var(--text); }
-.toggle, .menu summary {
+.menu summary {
   border: 1px solid var(--line); background: var(--bg);
   border-radius: 18px; padding: 6px 14px; cursor: pointer;
 }
-@media (hover: hover) { .toggle:hover, .menu summary:hover { background: var(--hover); } }
-.toggle[aria-pressed="true"] { background: var(--ok-soft); border-color: #34a853; color: var(--ok); font-weight: 600; }
+@media (hover: hover) { .menu summary:hover { background: var(--hover); } }
 .menu { position: relative; }
 .menu summary { list-style: none; }
 .menu summary::-webkit-details-marker { display: none; }

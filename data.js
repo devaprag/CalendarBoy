@@ -135,7 +135,7 @@ const SEED = (() => {
 
   return {
     version: 3,
-    settings: { pretendToday: TODAY, viewMonth: '2027-01', showDoneOnly: false, locked: true },
+    settings: { pretendToday: TODAY, viewMonth: '2027-01', locked: true },
     types: [
       { id: 'movie',     name: 'Movie',            icon: 'camera',       color: 'purple', goalPerMonth: 2,    cycleDays: null },
       { id: 'holiday',   name: 'Overseas holiday', icon: 'planeTakeoff', endIcon: 'planeLanding', multiDay: true, color: 'sky', goalPerMonth: null, cycleDays: null },
